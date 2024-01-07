@@ -16,6 +16,12 @@ impl IntoIterator for Tokens {
     }
 }
 
+impl Tokens {
+    fn push(&mut self, token: Token) {
+        self.0.push(token);
+    }
+}
+
 #[derive(PartialEq, Debug)]
 pub struct Token {
     pub value: TokenKind,
@@ -55,13 +61,17 @@ pub struct TokenMetadata {
 pub enum Symbol {
     Add,
     Sub,
+    Mul,
+    Div,
 }
 
-impl From<&str> for Symbol {
-    fn from(value: &str) -> Self {
+impl From<char> for Symbol {
+    fn from(value: char) -> Self {
         match value {
-            "+" => Self::Add,
-            "-" => Self::Sub,
+            '+' => Self::Add,
+            '-' => Self::Sub,
+            '*' => Self::Mul,
+            '/' => Self::Div,
             _ => panic!("Invalid symbol"),
         }
     }
@@ -75,6 +85,8 @@ impl fmt::Display for Symbol {
             match self {
                 Symbol::Add => "add",
                 Symbol::Sub => "sub",
+                Symbol::Mul => "mul",
+                Symbol::Div => "div",
             }
         )
     }
@@ -90,8 +102,7 @@ pub fn tokenize(s: &str) -> Result<Tokens> {
             ' ' | '\n' | '\r' => {
                 continue;
             }
-            '+' => tokens.0.push(Token::symbol(Symbol::Add, code_location)),
-            '-' => tokens.0.push(Token::symbol(Symbol::Sub, code_location)),
+            '+' | '-' | '*' | '/' => tokens.push(Token::symbol(Symbol::from(char), code_location)),
             '0'..='9' => {
                 let mut numbers = String::new();
                 numbers.push(char);
@@ -105,12 +116,10 @@ pub fn tokenize(s: &str) -> Result<Tokens> {
                     }
                 }
 
-                tokens
-                    .0
-                    .push(Token::num(numbers.parse().unwrap(), code_location))
+                tokens.push(Token::num(numbers.parse().unwrap(), code_location))
             }
             _ => {
-                error_reporter::report_error(s, code_location, "Invalid token");
+                error_reporter::report(s, code_location, "Invalid token");
             }
         }
     }

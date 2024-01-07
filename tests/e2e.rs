@@ -46,7 +46,7 @@ fn test_ng_only_symbol() {
     assert.failure().stderr(
         "\
 10 + 2 + +
-         ^ Next to op must be num
+         ^ The value next to operator must be Number
 
 ",
     );

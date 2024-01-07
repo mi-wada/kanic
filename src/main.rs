@@ -1,14 +1,13 @@
 use std::env::args;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use tokenizer::{tokenize, Token, TokenKind};
 
 mod error_reporter;
 mod tokenizer;
-mod utils;
 
 fn main() -> Result<()> {
-    let x = args().nth(1).expect("Please provide a number");
+    let x = args().nth(1).expect("Please provide a expr");
 
     println!("{}", to_asem(&x)?);
 
@@ -27,18 +26,14 @@ main:\n",
     if let Some(token) = tokens.next() {
         match token.value {
             TokenKind::Num(n) => res += &format!("        mov rax, {}\n", n),
-            _ => error_reporter::report_error(
-                x,
-                token.metadata.code_location,
-                "First expr must number",
-            ),
+            _ => error_reporter::report(x, token.metadata.code_location, "First expr must number"),
         }
     }
 
     while let Some(token) = tokens.next() {
         match token.value {
             TokenKind::Num(_) => {
-                error_reporter::report_error(x, token.metadata.code_location, "Unexpedted number");
+                error_reporter::report(x, token.metadata.code_location, "Unexpedted number");
             }
             TokenKind::Symbol(sym) => {
                 let token = tokens.next();
@@ -49,10 +44,10 @@ main:\n",
                 {
                     res += &format!("        {} rax, {}\n", sym, n)
                 } else {
-                    error_reporter::report_error(
+                    error_reporter::report(
                         x,
                         token.unwrap().metadata.code_location,
-                        "Next to op must be num",
+                        "The value next to operator must be Number",
                     );
                 }
             }
@@ -62,9 +57,4 @@ main:\n",
     res += "        ret\n";
 
     Ok(res)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
 }

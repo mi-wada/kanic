@@ -1,25 +1,29 @@
-use std::{fmt::format, process::exit};
+use std::process::exit;
 
-pub fn report_error(user_input: &str, error_location: usize, message: &str) {
+pub fn report(user_input: &str, error_location: usize, message: &str) {
+    if error_location > user_input.as_bytes().len() {
+        panic!("Invalid error_location")
+    }
+
     eprintln!("{}", error_message(user_input, error_location, message));
     exit(1);
 }
 
 fn error_message(user_input: &str, error_location: usize, message: &str) -> String {
     let (error_line, cumulative_bytes_count) = {
+        let mut error_line = "";
         let mut cumulative_bytes_count = 0;
-        let mut res = "";
         for line in user_input.lines() {
             // + 1 is for \n.
             cumulative_bytes_count += line.as_bytes().len() + 1;
             if error_location <= cumulative_bytes_count {
-                res = line;
+                error_line = line;
                 cumulative_bytes_count -= line.as_bytes().len() + 1;
                 break;
             }
-            res = line;
+            error_line = line;
         }
-        (res, cumulative_bytes_count)
+        (error_line, cumulative_bytes_count)
     };
 
     let error_column_number = error_location - cumulative_bytes_count;
