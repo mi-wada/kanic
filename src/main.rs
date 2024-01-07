@@ -2,6 +2,7 @@ use std::env::args;
 
 use anyhow::{bail, Result};
 
+mod tokenizer;
 mod utils;
 
 fn main() -> Result<()> {
