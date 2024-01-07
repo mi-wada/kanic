@@ -1,3 +1,5 @@
+use core::fmt;
+
 use anyhow::Result;
 
 #[derive(PartialEq, Debug)]
@@ -19,7 +21,7 @@ pub enum Token {
 }
 
 #[derive(PartialEq, Debug)]
-enum Symbol {
+pub enum Symbol {
     Add,
     Sub,
 }
@@ -31,6 +33,19 @@ impl From<&str> for Symbol {
             "-" => Self::Sub,
             _ => panic!("Invalid symbol"),
         }
+    }
+}
+
+impl fmt::Display for Symbol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Symbol::Add => "add",
+                Symbol::Sub => "sub",
+            }
+        )
     }
 }
 

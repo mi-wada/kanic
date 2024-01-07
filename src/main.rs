@@ -1,6 +1,7 @@
 use std::env::args;
 
 use anyhow::{bail, Result};
+use tokenizer::{tokenize, Token};
 
 mod tokenizer;
 mod utils;
@@ -20,30 +21,28 @@ fn to_asem(x: &str) -> Result<String> {
 main:\n",
     );
 
-    let (num, rest) = utils::exstract_head_int(x);
+    let mut tokens = tokenize(x)?.into_iter().peekable();
 
-    match num {
-        Some(num) => res += &format!("        mov rax, {}\n", num),
-        None => bail!("Specify first num"),
+    if let Some(token) = tokens.next() {
+        match token {
+            Token::Num(n) => res += &format!("        mov rax, {}\n", n),
+            _ => {
+                panic!("First expr must number")
+            }
+        }
     }
 
-    let mut rest = rest;
-    while let Some(expr) = rest {
-        let op = match expr.chars().next().unwrap() {
-            '+' => "add",
-            '-' => "sub",
-            op => {
-                bail!("Invalid op: {}", op)
+    while let Some(token) = tokens.next() {
+        match token {
+            Token::Num(_) => {
+                panic!("Unexpedted number");
             }
-        };
-
-        let (num, rest_) = utils::exstract_head_int(&expr[1..]);
-        rest = rest_;
-
-        match num {
-            Some(num) => res += &format!("        {} rax, {}\n", op, num),
-            None => {
-                bail!("Invalid expr")
+            Token::Symbol(sym) => {
+                if let Some(Token::Num(n)) = tokens.next() {
+                    res += &format!("        {} rax, {}\n", sym, n)
+                } else {
+                    panic!("Next to op must be num")
+                }
             }
         }
     }
