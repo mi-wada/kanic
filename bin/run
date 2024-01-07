@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# Usage: bin/run <c_file_name>
+
+set -euo pipefail
+
+c_file_name="$1"
+command_name="${c_file_name%.*}"
+
+cargo run -- -o ${command_name}.s ${command_name}.c && \
+  cc -o ${command_name} ${command_name}.s && \
+  ${command_name}
