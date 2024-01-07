@@ -7,3 +7,6 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.79"
+
+[dev-dependencies]
+assert_cmd = "2.0.12"
