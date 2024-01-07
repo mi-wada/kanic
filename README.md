@@ -2,9 +2,7 @@
 
 ## What is this repository?
 
-Implement a C compiler in Rust according to the following site.
-
-<https://www.sigbus.info/compilerbook>
+C Compiler written by Rust. Based on <https://www.sigbus.info/compilerbook>.
 
 ## Run Container
 
