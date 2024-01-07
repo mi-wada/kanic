@@ -2,6 +2,8 @@ use core::fmt;
 
 use anyhow::Result;
 
+use crate::error_reporter;
+
 #[derive(PartialEq, Debug)]
 pub struct Tokens(Vec<Token>);
 
@@ -15,9 +17,38 @@ impl IntoIterator for Tokens {
 }
 
 #[derive(PartialEq, Debug)]
-pub enum Token {
+pub struct Token {
+    pub value: TokenKind,
+    pub metadata: TokenMetadata,
+}
+
+impl Token {
+    fn new(value: TokenKind, code_location: usize) -> Self {
+        Self {
+            value,
+            metadata: TokenMetadata { code_location },
+        }
+    }
+
+    pub fn symbol(symbol_kind: Symbol, code_location: usize) -> Self {
+        Self::new(TokenKind::Symbol(symbol_kind), code_location)
+    }
+
+    pub fn num(num: i64, code_location: usize) -> Self {
+        Self::new(TokenKind::Num(num), code_location)
+    }
+}
+
+#[derive(PartialEq, Debug)]
+pub enum TokenKind {
     Symbol(Symbol),
     Num(i64),
+}
+
+#[derive(PartialEq, Debug)]
+pub struct TokenMetadata {
+    // Indicates how many bytes of the source code the token starts from.
+    pub code_location: usize,
 }
 
 #[derive(PartialEq, Debug)]
@@ -52,20 +83,20 @@ impl fmt::Display for Symbol {
 pub fn tokenize(s: &str) -> Result<Tokens> {
     let mut tokens = Tokens(vec![]);
 
-    let mut chars = s.chars().peekable();
+    let mut chars = s.char_indices().peekable();
 
-    while let Some(char) = chars.next() {
+    while let Some((code_location, char)) = chars.next() {
         match char {
             ' ' | '\n' | '\r' => {
                 continue;
             }
-            '+' => tokens.0.push(Token::Symbol(Symbol::Add)),
-            '-' => tokens.0.push(Token::Symbol(Symbol::Sub)),
+            '+' => tokens.0.push(Token::symbol(Symbol::Add, code_location)),
+            '-' => tokens.0.push(Token::symbol(Symbol::Sub, code_location)),
             '0'..='9' => {
                 let mut numbers = String::new();
                 numbers.push(char);
 
-                while let Some(&next_char) = chars.peek() {
+                while let Some(&(_, next_char)) = chars.peek() {
                     if next_char.is_ascii_digit() {
                         numbers.push(next_char);
                         chars.next();
@@ -74,10 +105,12 @@ pub fn tokenize(s: &str) -> Result<Tokens> {
                     }
                 }
 
-                tokens.0.push(Token::Num(numbers.parse().unwrap()))
+                tokens
+                    .0
+                    .push(Token::num(numbers.parse().unwrap(), code_location))
             }
-            c => {
-                panic!("Invalid token: {}", c)
+            _ => {
+                error_reporter::report_error(s, code_location, "Invalid token");
             }
         }
     }
@@ -93,11 +126,11 @@ mod tests {
     fn test_success() -> Result<()> {
         let mut actual = tokenize("1 + 2 - 10")?.into_iter();
 
-        assert_eq!(actual.next(), Some(Token::Num(1)));
-        assert_eq!(actual.next(), Some(Token::Symbol(Symbol::Add)));
-        assert_eq!(actual.next(), Some(Token::Num(2)));
-        assert_eq!(actual.next(), Some(Token::Symbol(Symbol::Sub)));
-        assert_eq!(actual.next(), Some(Token::Num(10)));
+        assert_eq!(actual.next(), Some(Token::num(1, 0)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Add, 2)));
+        assert_eq!(actual.next(), Some(Token::num(2, 4)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Sub, 6)));
+        assert_eq!(actual.next(), Some(Token::num(10, 8)));
         assert_eq!(actual.next(), None);
 
         Ok(())

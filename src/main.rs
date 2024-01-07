@@ -1,8 +1,9 @@
 use std::env::args;
 
 use anyhow::{bail, Result};
-use tokenizer::{tokenize, Token};
+use tokenizer::{tokenize, Token, TokenKind};
 
+mod error_reporter;
 mod tokenizer;
 mod utils;
 
@@ -24,24 +25,35 @@ main:\n",
     let mut tokens = tokenize(x)?.into_iter().peekable();
 
     if let Some(token) = tokens.next() {
-        match token {
-            Token::Num(n) => res += &format!("        mov rax, {}\n", n),
-            _ => {
-                panic!("First expr must number")
-            }
+        match token.value {
+            TokenKind::Num(n) => res += &format!("        mov rax, {}\n", n),
+            _ => error_reporter::report_error(
+                x,
+                token.metadata.code_location,
+                "First expr must number",
+            ),
         }
     }
 
     while let Some(token) = tokens.next() {
-        match token {
-            Token::Num(_) => {
-                panic!("Unexpedted number");
+        match token.value {
+            TokenKind::Num(_) => {
+                error_reporter::report_error(x, token.metadata.code_location, "Unexpedted number");
             }
-            Token::Symbol(sym) => {
-                if let Some(Token::Num(n)) = tokens.next() {
+            TokenKind::Symbol(sym) => {
+                let token = tokens.next();
+                if let Some(Token {
+                    value: TokenKind::Num(n),
+                    ..
+                }) = token
+                {
                     res += &format!("        {} rax, {}\n", sym, n)
                 } else {
-                    panic!("Next to op must be num")
+                    error_reporter::report_error(
+                        x,
+                        token.unwrap().metadata.code_location,
+                        "Next to op must be num",
+                    );
                 }
             }
         }
