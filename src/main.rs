@@ -1,60 +1,55 @@
 use std::env::args;
 
 use anyhow::Result;
-use tokenizer::{tokenize, Token, TokenKind};
+use lexer::{tokenize, Token, TokenKind};
+use parser::Node;
+
+use crate::parser::NodeKind;
 
 mod error_reporter;
-mod tokenizer;
+mod lexer;
+mod parser;
 
 fn main() -> Result<()> {
     let x = args().nth(1).expect("Please provide a expr");
 
-    println!("{}", to_asem(&x)?);
+    println!("{}", to_asem_entry_point(&x)?);
 
     Ok(())
 }
 
-fn to_asem(x: &str) -> Result<String> {
-    let mut res = String::from(
-        ".intel_syntax noprefix
-.globl main\n
-main:\n",
-    );
+fn to_asem_entry_point(x: &str) -> Result<String> {
+    Ok(String::from(
+        "\
+.intel_syntax noprefix
+.globl main
 
-    let mut tokens = tokenize(x)?.into_iter().peekable();
+main:
+",
+    ) + &to_asem(&parser::parse(lexer::tokenize(x)?))?
+        + "        pop rax
+        ret
+")
+}
 
-    if let Some(token) = tokens.next() {
-        match token.value {
-            TokenKind::Num(n) => res += &format!("        mov rax, {}\n", n),
-            _ => error_reporter::report(x, token.metadata.code_location, "First expr must number"),
-        }
+fn to_asem(ast: &Node) -> Result<String> {
+    match ast {
+        Node {
+            value: NodeKind::Num(n),
+            ..
+        } => Ok(format!("        push {}\n", n)),
+        Node {
+            value: NodeKind::ArithOp(arith_op),
+            lhs,
+            rhs,
+        } => Ok(to_asem(lhs.as_ref().unwrap())?
+            + &to_asem(rhs.as_ref().unwrap())?
+            + &format!(
+                "        pop rdi
+        pop rax
+        {arith_op} rax, rdi
+        push rax
+"
+            )),
     }
-
-    while let Some(token) = tokens.next() {
-        match token.value {
-            TokenKind::Num(_) => {
-                error_reporter::report(x, token.metadata.code_location, "Unexpedted number");
-            }
-            TokenKind::Symbol(sym) => {
-                let token = tokens.next();
-                if let Some(Token {
-                    value: TokenKind::Num(n),
-                    ..
-                }) = token
-                {
-                    res += &format!("        {} rax, {}\n", sym, n)
-                } else {
-                    error_reporter::report(
-                        x,
-                        token.unwrap().metadata.code_location,
-                        "The value next to operator must be Number",
-                    );
-                }
-            }
-        }
-    }
-
-    res += "        ret\n";
-
-    Ok(res)
 }

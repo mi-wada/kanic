@@ -11,7 +11,8 @@ fn test_ok_single_int() {
 .globl main
 
 main:
-        mov rax, 42
+        push 42
+        pop rax
         ret
 
 ",
@@ -19,7 +20,7 @@ main:
 }
 
 #[test]
-fn test_ok_formula() {
+fn test_ok_simple_formula() {
     let mut cmd = Command::cargo_bin("kanic").unwrap();
     let assert = cmd.arg("5+20-4").assert();
 
@@ -29,9 +30,57 @@ fn test_ok_formula() {
 .globl main
 
 main:
-        mov rax, 5
-        add rax, 20
-        sub rax, 4
+        push 5
+        push 20
+        pop rdi
+        pop rax
+        add rax, rdi
+        push rax
+        push 4
+        pop rdi
+        pop rax
+        sub rax, rdi
+        push rax
+        pop rax
+        ret
+
+",
+    );
+}
+
+#[test]
+fn test_ok_complex_formula() {
+    let mut cmd = Command::cargo_bin("kanic").unwrap();
+    let assert = cmd.arg("(1 + 2) * 3 - 4 / 5").assert();
+
+    assert.success().stdout(
+        "\
+.intel_syntax noprefix
+.globl main
+
+main:
+        push 1
+        push 2
+        pop rdi
+        pop rax
+        add rax, rdi
+        push rax
+        push 3
+        pop rdi
+        pop rax
+        mul rax, rdi
+        push rax
+        push 4
+        push 5
+        pop rdi
+        pop rax
+        div rax, rdi
+        push rax
+        pop rdi
+        pop rax
+        sub rax, rdi
+        push rax
+        pop rax
         ret
 
 ",
@@ -41,12 +90,12 @@ main:
 #[test]
 fn test_ng_only_symbol() {
     let mut cmd = Command::cargo_bin("kanic").unwrap();
-    let assert = cmd.arg("10 + 2 + +").assert();
+    let assert = cmd.arg("10 + 2 + moge").assert();
 
     assert.failure().stderr(
         "\
-10 + 2 + +
-         ^ The value next to operator must be Number
+10 + 2 + moge
+         ^ Invalid token
 
 ",
     );

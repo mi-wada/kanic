@@ -1,12 +1,13 @@
 use crate::lexer::{Symbol, Token, TokenKind, Tokens};
 
+use core::fmt;
 use std::iter::Peekable;
 
 #[derive(Debug, PartialEq)]
 pub struct Node {
     pub value: NodeKind,
-    lhs: NodeChild,
-    rhs: NodeChild,
+    pub lhs: NodeChild,
+    pub rhs: NodeChild,
 }
 
 type NodeChild = Option<Box<Node>>;
@@ -41,6 +42,21 @@ pub enum ArithOp {
     Sub,
     Mul,
     Div,
+}
+
+impl fmt::Display for ArithOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                ArithOp::Add => "add",
+                ArithOp::Sub => "sub",
+                ArithOp::Mul => "mul",
+                ArithOp::Div => "div",
+            }
+        )
+    }
 }
 
 impl From<&TokenKind> for ArithOp {
