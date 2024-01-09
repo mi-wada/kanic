@@ -63,6 +63,8 @@ pub enum Symbol {
     Sub,
     Mul,
     Div,
+    LParen,
+    RParen,
 }
 
 impl From<char> for Symbol {
@@ -72,6 +74,8 @@ impl From<char> for Symbol {
             '-' => Self::Sub,
             '*' => Self::Mul,
             '/' => Self::Div,
+            '(' => Self::LParen,
+            ')' => Self::RParen,
             _ => panic!("Invalid symbol"),
         }
     }
@@ -87,6 +91,8 @@ impl fmt::Display for Symbol {
                 Symbol::Sub => "sub",
                 Symbol::Mul => "mul",
                 Symbol::Div => "div",
+                Symbol::LParen => "",
+                Symbol::RParen => "",
             }
         )
     }
@@ -102,7 +108,9 @@ pub fn tokenize(s: &str) -> Result<Tokens> {
             ' ' | '\n' | '\r' => {
                 continue;
             }
-            '+' | '-' | '*' | '/' => tokens.push(Token::symbol(Symbol::from(char), code_location)),
+            '+' | '-' | '*' | '/' | '(' | ')' => {
+                tokens.push(Token::symbol(Symbol::from(char), code_location))
+            }
             '0'..='9' => {
                 let mut numbers = String::new();
                 numbers.push(char);
@@ -133,13 +141,19 @@ mod tests {
 
     #[test]
     fn test_success() -> Result<()> {
-        let mut actual = tokenize("1 + 2 - 10")?.into_iter();
+        let mut actual = tokenize("(1 + 2) * 3 - 4 / 5")?.into_iter();
 
-        assert_eq!(actual.next(), Some(Token::num(1, 0)));
-        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Add, 2)));
-        assert_eq!(actual.next(), Some(Token::num(2, 4)));
-        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Sub, 6)));
-        assert_eq!(actual.next(), Some(Token::num(10, 8)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::LParen, 0)));
+        assert_eq!(actual.next(), Some(Token::num(1, 1)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Add, 3)));
+        assert_eq!(actual.next(), Some(Token::num(2, 5)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::RParen, 6)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Mul, 8)));
+        assert_eq!(actual.next(), Some(Token::num(3, 10)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Sub, 12)));
+        assert_eq!(actual.next(), Some(Token::num(4, 14)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Div, 16)));
+        assert_eq!(actual.next(), Some(Token::num(5, 18)));
         assert_eq!(actual.next(), None);
 
         Ok(())
