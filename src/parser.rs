@@ -4,36 +4,29 @@ use core::fmt;
 use std::iter::Peekable;
 
 #[derive(Debug, PartialEq)]
-pub struct Node {
-    pub value: NodeKind,
-    pub lhs: NodeChild,
-    pub rhs: NodeChild,
+pub enum Node {
+    Num(i64),
+    ArithOp {
+        value: ArithOp,
+        lhs: NodeChild,
+        rhs: NodeChild,
+    },
 }
 
-type NodeChild = Option<Box<Node>>;
+type NodeChild = Box<Node>;
 
 impl Node {
-    fn new(value: NodeKind, lhs: NodeChild, rhs: NodeChild) -> Self {
-        Node { value, lhs, rhs }
-    }
-
     fn num(value: i64) -> Self {
-        Self::new(NodeKind::Num(value), None, None)
+        Self::Num(value)
     }
 
     fn arith_op(value: ArithOp, lhs: Node, rhs: Node) -> Self {
-        Self::new(
-            NodeKind::ArithOp(value),
-            Some(Box::new(lhs)),
-            Some(Box::new(rhs)),
-        )
+        Self::ArithOp {
+            value,
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+        }
     }
-}
-
-#[derive(Debug, PartialEq)]
-pub enum NodeKind {
-    ArithOp(ArithOp),
-    Num(i64),
 }
 
 #[derive(Debug, PartialEq)]

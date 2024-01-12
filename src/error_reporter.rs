@@ -1,6 +1,6 @@
 use std::process::exit;
 
-pub fn report(user_input: &str, error_location: usize, message: &str) {
+pub fn report(user_input: &str, error_location: usize, message: &str) -> ! {
     if error_location > user_input.as_bytes().len() {
         panic!("Invalid error_location")
     }

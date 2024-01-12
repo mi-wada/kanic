@@ -1,10 +1,7 @@
 use std::env::args;
 
 use anyhow::Result;
-use lexer::{tokenize, Token, TokenKind};
 use parser::Node;
-
-use crate::parser::NodeKind;
 
 mod error_reporter;
 mod lexer;
@@ -34,16 +31,13 @@ main:
 
 fn to_asem(ast: &Node) -> Result<String> {
     match ast {
-        Node {
-            value: NodeKind::Num(n),
-            ..
-        } => Ok(format!("        push {}\n", n)),
-        Node {
-            value: NodeKind::ArithOp(arith_op),
+        Node::Num(n) => Ok(format!("        push {}\n", n)),
+        Node::ArithOp {
+            value: arith_op,
             lhs,
             rhs,
-        } => Ok(to_asem(lhs.as_ref().unwrap())?
-            + &to_asem(rhs.as_ref().unwrap())?
+        } => Ok(to_asem(lhs.as_ref())?
+            + &to_asem(rhs.as_ref())?
             + &format!(
                 "        pop rdi
         pop rax
