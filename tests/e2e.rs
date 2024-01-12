@@ -68,13 +68,14 @@ main:
         push 3
         pop rdi
         pop rax
-        mul rax, rdi
+        imul rax, rdi
         push rax
         push 4
         push 5
         pop rdi
         pop rax
-        div rax, rdi
+        cqo
+        idiv rdi
         push rax
         pop rdi
         pop rax

@@ -1,7 +1,7 @@
 use std::env::args;
 
 use anyhow::Result;
-use parser::Node;
+use parser::{ArithOp, Node};
 
 mod error_reporter;
 mod lexer;
@@ -36,14 +36,26 @@ fn to_asem(ast: &Node) -> Result<String> {
             value: arith_op,
             lhs,
             rhs,
-        } => Ok(to_asem(lhs.as_ref())?
-            + &to_asem(rhs.as_ref())?
-            + &format!(
-                "        pop rdi
+        } => match arith_op {
+            ArithOp::Add | ArithOp::Sub | ArithOp::Mul => Ok(to_asem(lhs.as_ref())?
+                + &to_asem(rhs.as_ref())?
+                + &format!(
+                    "        pop rdi
         pop rax
         {arith_op} rax, rdi
         push rax
 "
-            )),
+                )),
+            ArithOp::Div => Ok(to_asem(lhs.as_ref())?
+                + &to_asem(rhs.as_ref())?
+                + &format!(
+                    "        pop rdi
+        pop rax
+        cqo
+        {arith_op} rdi
+        push rax
+"
+                )),
+        },
     }
 }

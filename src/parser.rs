@@ -45,8 +45,8 @@ impl fmt::Display for ArithOp {
             match self {
                 ArithOp::Add => "add",
                 ArithOp::Sub => "sub",
-                ArithOp::Mul => "mul",
-                ArithOp::Div => "div",
+                ArithOp::Mul => "imul",
+                ArithOp::Div => "idiv",
             }
         )
     }
