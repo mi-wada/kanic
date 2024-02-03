@@ -1,4 +1,4 @@
-use std::env::args;
+use std::{env::args, fmt::format};
 
 use anyhow::Result;
 use parser::{ArithOp, Node};
@@ -57,5 +57,20 @@ fn to_asem(ast: &Node) -> Result<String> {
 "
                 )),
         },
+        Node::CmpOp {
+            value: cmp_op,
+            lhs,
+            rhs,
+        } => Ok(to_asem(lhs.as_ref())?
+            + &to_asem(rhs.as_ref())?
+            + &format!(
+                "        pop rdi
+        pop rax
+        cmp rax, rdi
+        {cmp_op} al
+        movzb rax, al
+        push rax
+"
+            )),
     }
 }

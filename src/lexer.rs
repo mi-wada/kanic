@@ -65,6 +65,32 @@ pub enum Symbol {
     Div,
     LParen,
     RParen,
+    Lt,
+    Lte,
+    Gt,
+    Gte,
+    Eq,
+    Neq,
+}
+
+impl From<&str> for Symbol {
+    fn from(value: &str) -> Self {
+        match value {
+            "+" => Self::Add,
+            "-" => Self::Sub,
+            "*" => Self::Mul,
+            "/" => Self::Div,
+            "(" => Self::LParen,
+            ")" => Self::RParen,
+            "<" => Self::Lt,
+            "<=" => Self::Lte,
+            ">" => Self::Gt,
+            ">=" => Self::Gte,
+            "==" => Self::Eq,
+            "!=" => Self::Neq,
+            _ => panic!("Invalid symbol"),
+        }
+    }
 }
 
 impl From<char> for Symbol {
@@ -76,6 +102,8 @@ impl From<char> for Symbol {
             '/' => Self::Div,
             '(' => Self::LParen,
             ')' => Self::RParen,
+            '<' => Self::Lt,
+            '>' => Self::Gt,
             _ => panic!("Invalid symbol"),
         }
     }
@@ -93,6 +121,12 @@ impl fmt::Display for Symbol {
                 Symbol::Div => "div",
                 Symbol::LParen => "",
                 Symbol::RParen => "",
+                Symbol::Lt => "setl",
+                Symbol::Lte => "setle",
+                Symbol::Gt => panic!("Use Lt"),
+                Symbol::Gte => panic!("Use Lte"),
+                Symbol::Eq => "sete",
+                Symbol::Neq => "setne",
             }
         )
     }
@@ -110,6 +144,38 @@ pub fn tokenize(s: &str) -> Result<Tokens> {
             }
             '+' | '-' | '*' | '/' | '(' | ')' => {
                 tokens.push(Token::symbol(Symbol::from(char), code_location))
+            }
+            '<' | '>' => {
+                let next_char = chars.peek().map(|&(_, c)| c);
+
+                match (char, next_char) {
+                    ('<', Some('=')) => {
+                        chars.next();
+                        tokens.push(Token::symbol(Symbol::Lte, code_location))
+                    }
+                    ('>', Some('=')) => {
+                        chars.next();
+                        tokens.push(Token::symbol(Symbol::Gte, code_location))
+                    }
+                    _ => tokens.push(Token::symbol(Symbol::from(char), code_location)),
+                }
+            }
+            '=' | '!' => {
+                let next_char = chars.peek().map(|&(_, c)| c);
+
+                match (char, next_char) {
+                    ('=', Some('=')) => {
+                        chars.next();
+                        tokens.push(Token::symbol(Symbol::Eq, code_location))
+                    }
+                    ('!', Some('=')) => {
+                        chars.next();
+                        tokens.push(Token::symbol(Symbol::Neq, code_location))
+                    }
+                    _ => {
+                        error_reporter::report(s, code_location, "Invalid token");
+                    }
+                }
             }
             '0'..='9' => {
                 let mut numbers = String::new();
@@ -157,6 +223,27 @@ mod tests {
         assert_eq!(actual.next(), Some(Token::symbol(Symbol::Div, 18)));
         assert_eq!(actual.next(), Some(Token::num(5, 20)));
         assert_eq!(actual.next(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_success_with_comparison_operator() -> Result<()> {
+        let mut actual = tokenize("1 < 2 <= 3 > 4 >= 5 == 6 != 7")?.into_iter();
+
+        assert_eq!(actual.next(), Some(Token::num(1, 0)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Lt, 2)));
+        assert_eq!(actual.next(), Some(Token::num(2, 4)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Lte, 6)));
+        assert_eq!(actual.next(), Some(Token::num(3, 9)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Gt, 11)));
+        assert_eq!(actual.next(), Some(Token::num(4, 13)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Gte, 15)));
+        assert_eq!(actual.next(), Some(Token::num(5, 18)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Eq, 20)));
+        assert_eq!(actual.next(), Some(Token::num(6, 23)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Neq, 25)));
+        assert_eq!(actual.next(), Some(Token::num(7, 28)));
 
         Ok(())
     }

@@ -11,6 +11,11 @@ pub enum Node {
         lhs: NodeChild,
         rhs: NodeChild,
     },
+    CmpOp {
+        value: CmpOp,
+        lhs: NodeChild,
+        rhs: NodeChild,
+    },
 }
 
 type NodeChild = Box<Node>;
@@ -25,6 +30,51 @@ impl Node {
             value,
             lhs: Box::new(lhs),
             rhs: Box::new(rhs),
+        }
+    }
+
+    fn cmp_op(value: CmpOp, lhs: Node, rhs: Node) -> Self {
+        Self::CmpOp {
+            value,
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum CmpOp {
+    Lt,
+    Lte,
+    Eq,
+    Neq,
+}
+
+impl fmt::Display for CmpOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                CmpOp::Lt => "setl",
+                CmpOp::Lte => "setle",
+                CmpOp::Eq => "sete",
+                CmpOp::Neq => "setne",
+            }
+        )
+    }
+}
+
+impl From<&TokenKind> for CmpOp {
+    fn from(value: &TokenKind) -> Self {
+        match value {
+            TokenKind::Symbol(Symbol::Lt) => Self::Lt,
+            TokenKind::Symbol(Symbol::Lte) => Self::Lte,
+            TokenKind::Symbol(Symbol::Eq) => Self::Eq,
+            TokenKind::Symbol(Symbol::Neq) => Self::Neq,
+            _ => {
+                panic!("Invalid token passed: {:?}", value);
+            }
         }
     }
 }
@@ -76,6 +126,69 @@ fn expr<I>(tokens: &mut Peekable<I>) -> Node
 where
     I: Iterator<Item = Token>,
 {
+    equality(tokens)
+}
+
+fn equality<I>(tokens: &mut Peekable<I>) -> Node
+where
+    I: Iterator<Item = Token>,
+{
+    let mut node = relational(tokens);
+
+    while let Some(token) = tokens.peek() {
+        match token.value {
+            TokenKind::Symbol(Symbol::Eq | Symbol::Neq) => {
+                node = Node::cmp_op(
+                    CmpOp::from(&tokens.next().unwrap().value),
+                    node,
+                    relational(tokens),
+                )
+            }
+            _ => {
+                break;
+            }
+        }
+    }
+
+    node
+}
+
+fn relational<I>(tokens: &mut Peekable<I>) -> Node
+where
+    I: Iterator<Item = Token>,
+{
+    let mut node = add(tokens);
+
+    while let Some(token) = tokens.peek() {
+        match token.value {
+            TokenKind::Symbol(Symbol::Lt | Symbol::Lte) => {
+                node = Node::cmp_op(
+                    CmpOp::from(&tokens.next().unwrap().value),
+                    node,
+                    add(tokens),
+                )
+            }
+            TokenKind::Symbol(Symbol::Gt) => {
+                tokens.next().unwrap();
+                node = Node::cmp_op(CmpOp::Lt, add(tokens), node);
+            }
+            TokenKind::Symbol(Symbol::Gte) => {
+                tokens.next().unwrap();
+                node = Node::cmp_op(CmpOp::Lte, add(tokens), node);
+            }
+            _ => {
+                break;
+            }
+        }
+    }
+
+    node
+}
+
+fn add<I>(tokens: &mut Peekable<I>) -> Node
+where
+    I: Iterator<Item = Token>,
+{
     let mut node = mul(tokens);
 
     while let Some(token) = tokens.peek() {
@@ -88,7 +201,7 @@ where
                 )
             }
             _ => {
-                return node;
+                break;
             }
         }
     }
@@ -171,7 +284,7 @@ where
             node
         }
         _ => {
-            panic!("Unexpected token")
+            panic!("Unexpected token");
         }
     }
 }
@@ -213,6 +326,35 @@ mod tests {
                     Node::num(3),
                 ),
                 Node::arith_op(ArithOp::Div, Node::num(4), Node::num(5))
+            )
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_ok_with_cmp() -> Result<()> {
+        let tokens = lexer::tokenize("(1 + 2 * 3 > 4) != (5 < 6 == 7 >= 8)")?;
+        let actual = parse(tokens);
+
+        assert_eq!(
+            actual,
+            Node::cmp_op(
+                CmpOp::Neq,
+                Node::cmp_op(
+                    CmpOp::Lt,
+                    Node::num(4),
+                    Node::arith_op(
+                        ArithOp::Add,
+                        Node::num(1),
+                        Node::arith_op(ArithOp::Mul, Node::num(2), Node::num(3))
+                    )
+                ),
+                Node::cmp_op(
+                    CmpOp::Eq,
+                    Node::cmp_op(CmpOp::Lt, Node::num(5), Node::num(6)),
+                    Node::cmp_op(CmpOp::Lte, Node::num(8), Node::num(7),)
+                )
             )
         );
 
