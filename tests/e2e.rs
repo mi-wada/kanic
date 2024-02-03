@@ -1,103 +1,46 @@
-use assert_cmd::Command;
-
 #[test]
 fn test_ok_single_int() {
-    let mut cmd = Command::cargo_bin("kanic").unwrap();
-    let assert = cmd.arg("42").assert();
+    let res = std::process::Command::new("bin/run_arg")
+        .arg("42")
+        .output()
+        .unwrap();
 
-    assert.success().stdout(
-        "\
-.intel_syntax noprefix
-.globl main
-
-main:
-        push 42
-        pop rax
-        ret
-
-",
-    );
+    assert_eq!(res.status.code(), Some(42));
 }
 
 #[test]
 fn test_ok_simple_formula() {
-    let mut cmd = Command::cargo_bin("kanic").unwrap();
-    let assert = cmd.arg("5+20-4").assert();
+    let res = std::process::Command::new("bin/run_arg")
+        .arg("5+20-4")
+        .output()
+        .unwrap();
 
-    assert.success().stdout(
-        "\
-.intel_syntax noprefix
-.globl main
-
-main:
-        push 5
-        push 20
-        pop rdi
-        pop rax
-        add rax, rdi
-        push rax
-        push 4
-        pop rdi
-        pop rax
-        sub rax, rdi
-        push rax
-        pop rax
-        ret
-
-",
-    );
+    assert_eq!(res.status.code(), Some(21));
 }
 
 #[test]
 fn test_ok_complex_formula() {
-    let mut cmd = Command::cargo_bin("kanic").unwrap();
-    let assert = cmd.arg("(1 + 2) * 3 - 4 / 5").assert();
+    let res = std::process::Command::new("bin/run_arg")
+        .arg("(3 - 1) * 3 - 5 / 5")
+        .output()
+        .unwrap();
 
-    assert.success().stdout(
-        "\
-.intel_syntax noprefix
-.globl main
-
-main:
-        push 1
-        push 2
-        pop rdi
-        pop rax
-        add rax, rdi
-        push rax
-        push 3
-        pop rdi
-        pop rax
-        imul rax, rdi
-        push rax
-        push 4
-        push 5
-        pop rdi
-        pop rax
-        cqo
-        idiv rdi
-        push rax
-        pop rdi
-        pop rax
-        sub rax, rdi
-        push rax
-        pop rax
-        ret
-
-",
-    );
+    assert_eq!(res.status.code(), Some(5));
 }
 
 #[test]
 fn test_ng_only_symbol() {
-    let mut cmd = Command::cargo_bin("kanic").unwrap();
-    let assert = cmd.arg("10 + 2 + moge").assert();
+    let res = std::process::Command::new("target/debug/kanic")
+        .arg("10 + 2 + moge")
+        .output()
+        .unwrap();
 
-    assert.failure().stderr(
+    assert_eq!(
+        String::from_utf8(res.stderr).unwrap(),
         "\
 10 + 2 + moge
          ^ Invalid token
 
-",
+"
     );
 }
