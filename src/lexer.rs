@@ -141,19 +141,21 @@ mod tests {
 
     #[test]
     fn test_success() -> Result<()> {
-        let mut actual = tokenize("(1 + 2) * 3 - 4 / 5")?.into_iter();
+        let mut actual = tokenize("(+1 + -2) * 3 - 4 / 5")?.into_iter();
 
         assert_eq!(actual.next(), Some(Token::symbol(Symbol::LParen, 0)));
-        assert_eq!(actual.next(), Some(Token::num(1, 1)));
-        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Add, 3)));
-        assert_eq!(actual.next(), Some(Token::num(2, 5)));
-        assert_eq!(actual.next(), Some(Token::symbol(Symbol::RParen, 6)));
-        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Mul, 8)));
-        assert_eq!(actual.next(), Some(Token::num(3, 10)));
-        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Sub, 12)));
-        assert_eq!(actual.next(), Some(Token::num(4, 14)));
-        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Div, 16)));
-        assert_eq!(actual.next(), Some(Token::num(5, 18)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Add, 1)));
+        assert_eq!(actual.next(), Some(Token::num(1, 2)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Add, 4)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Sub, 6)));
+        assert_eq!(actual.next(), Some(Token::num(2, 7)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::RParen, 8)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Mul, 10)));
+        assert_eq!(actual.next(), Some(Token::num(3, 12)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Sub, 14)));
+        assert_eq!(actual.next(), Some(Token::num(4, 16)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Div, 18)));
+        assert_eq!(actual.next(), Some(Token::num(5, 20)));
         assert_eq!(actual.next(), None);
 
         Ok(())

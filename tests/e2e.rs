@@ -21,11 +21,11 @@ fn test_ok_simple_formula() {
 #[test]
 fn test_ok_complex_formula() {
     let res = std::process::Command::new("bin/run_arg")
-        .arg("(3 - 1) * 3 - 5 / 5")
+        .arg("(+3 + -2) * 3 - 5 / 5")
         .output()
         .unwrap();
 
-    assert_eq!(res.status.code(), Some(5));
+    assert_eq!(res.status.code(), Some(2));
 }
 
 #[test]

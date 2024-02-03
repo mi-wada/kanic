@@ -100,7 +100,7 @@ fn mul<I>(tokens: &mut Peekable<I>) -> Node
 where
     I: Iterator<Item = Token>,
 {
-    let mut node = primary(tokens);
+    let mut node = unary(tokens);
 
     while let Some(token) = tokens.peek() {
         match token.value {
@@ -108,7 +108,7 @@ where
                 node = Node::arith_op(
                     ArithOp::from(&tokens.next().unwrap().value),
                     node,
-                    primary(tokens),
+                    unary(tokens),
                 )
             }
             _ => {
@@ -118,6 +118,29 @@ where
     }
 
     node
+}
+
+fn unary<I>(tokens: &mut Peekable<I>) -> Node
+where
+    I: Iterator<Item = Token>,
+{
+    match tokens.peek() {
+        Some(Token {
+            value: TokenKind::Symbol(Symbol::Add),
+            ..
+        }) => {
+            tokens.next().unwrap();
+            primary(tokens)
+        }
+        Some(Token {
+            value: TokenKind::Symbol(Symbol::Sub),
+            ..
+        }) => {
+            tokens.next().unwrap();
+            Node::arith_op(ArithOp::Sub, Node::num(0), primary(tokens))
+        }
+        _ => primary(tokens),
+    }
 }
 
 fn primary<I>(tokens: &mut Peekable<I>) -> Node
@@ -173,7 +196,7 @@ mod tests {
 
     #[test]
     fn test_ok_parse_complex() -> Result<()> {
-        let tokens = lexer::tokenize("(1 + 2) * 3 - 4 / 5")?;
+        let tokens = lexer::tokenize("(+1 + -2) * 3 - 4 / 5")?;
         let actual = parse(tokens);
 
         assert_eq!(
@@ -182,7 +205,11 @@ mod tests {
                 ArithOp::Sub,
                 Node::arith_op(
                     ArithOp::Mul,
-                    Node::arith_op(ArithOp::Add, Node::num(1), Node::num(2)),
+                    Node::arith_op(
+                        ArithOp::Add,
+                        Node::num(1),
+                        Node::arith_op(ArithOp::Sub, Node::num(0), Node::num(2))
+                    ),
                     Node::num(3),
                 ),
                 Node::arith_op(ArithOp::Div, Node::num(4), Node::num(5))
