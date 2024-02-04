@@ -9,7 +9,7 @@ random_str=$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 8)
 assembly_file="tmp/${random_str}_test.s"
 machine_code_file="tmp/${random_str}_test"
 
-cargo run "$1" > ${assembly_file} && \
+./target/debug/kanic "$1" > ${assembly_file} && \
   cc -o ${machine_code_file} ${assembly_file} && \
   ${machine_code_file}
 
