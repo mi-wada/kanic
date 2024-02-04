@@ -1,51 +1,35 @@
-#[test]
-fn test_ok_single_int() {
+fn assert_exit_code(c_code: &str, expected: i32) {
     let res = std::process::Command::new("bin/run_arg")
-        .arg("42")
+        .arg(c_code)
         .output()
         .unwrap();
 
-    assert_eq!(res.status.code(), Some(42));
+    assert_eq!(res.status.code(), Some(expected));
+}
+
+#[test]
+fn test_ok_single_int() {
+    assert_exit_code("42", 42);
 }
 
 #[test]
 fn test_ok_simple_formula() {
-    let res = std::process::Command::new("bin/run_arg")
-        .arg("5+20-4")
-        .output()
-        .unwrap();
-
-    assert_eq!(res.status.code(), Some(21));
+    assert_exit_code("5+20-4", 21)
 }
 
 #[test]
 fn test_ok_complex_formula() {
-    let res = std::process::Command::new("bin/run_arg")
-        .arg("(+3 + -2) * 3 - 5 / 5")
-        .output()
-        .unwrap();
-
-    assert_eq!(res.status.code(), Some(2));
+    assert_exit_code("(+3 + -2) * 3 - 5 / 5", 2);
 }
 
 #[test]
 fn test_ok_cmp_true() {
-    let res = std::process::Command::new("bin/run_arg")
-        .arg("(1 < 2 * 3 + 4) == (5 * 6 - 7 >= 8)")
-        .output()
-        .unwrap();
-
-    assert_eq!(res.status.code(), Some(1));
+    assert_exit_code("(1 < 2 * 3 + 4) == (5 * 6 - 7 >= 8)", 1);
 }
 
 #[test]
 fn test_ok_cmp_false() {
-    let res = std::process::Command::new("bin/run_arg")
-        .arg("(1 < 2 * 3 + 4) == (5 * 6 - 7 <= 8)")
-        .output()
-        .unwrap();
-
-    assert_eq!(res.status.code(), Some(0));
+    assert_exit_code("(1 < 2 * 3 + 4) == (5 * 6 - 7 <= 8)", 0);
 }
 
 #[test]
