@@ -11,16 +11,32 @@ pub fn generate(c_code: &str) -> Result<String> {
 .globl main
 
 main:
+        push rbp
+        mov rbp, rsp
+        sub rsp, 208
 ",
-    ) + &to_asem(&parser::parse(lexer::tokenize(c_code)?))?
-        + "        pop rax
+    ) + &nodes_to_asem(&parser::parse(lexer::tokenize(c_code)?))?
+        + "        mov rsp, rbp
+        pop rbp
         ret
 ")
+}
+
+fn nodes_to_asem(nodes: &[Node]) -> Result<String> {
+    let mut asem = String::new();
+
+    for node in nodes {
+        asem += &to_asem(node)?;
+        asem += "        pop rax\n";
+    }
+
+    Ok(asem)
 }
 
 fn to_asem(ast: &Node) -> Result<String> {
     match ast {
         Node::Num(n) => Ok(format!("        push {}\n", n)),
+        Node::LocalVar { offset } => Ok(format!("        push [rbp-{offset}]\n")),
         Node::ArithOp {
             value: arith_op,
             lhs,
@@ -45,6 +61,19 @@ fn to_asem(ast: &Node) -> Result<String> {
         push rax
 "
                 )),
+            ArithOp::Assign => Ok(to_asem(rhs.as_ref())?
+                + &{
+                    if let Node::LocalVar { offset } = lhs.as_ref() {
+                        format!(
+                            "        pop rax
+        mov [rbp-{offset}], rax
+        push rax
+"
+                        )
+                    } else {
+                        panic!("lhs of assign must be LocalVar")
+                    }
+                }),
         },
         Node::CmpOp {
             value: cmp_op,

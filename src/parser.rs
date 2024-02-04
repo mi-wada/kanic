@@ -9,6 +9,10 @@ use std::iter::Peekable;
 #[derive(Debug, PartialEq)]
 pub enum Node {
     Num(i64),
+    LocalVar {
+        // Local variable address = RBP - offset
+        offset: usize,
+    },
     ArithOp {
         value: ArithOp,
         lhs: NodeChild,
@@ -26,6 +30,10 @@ type NodeChild = Box<Node>;
 impl Node {
     fn num(value: i64) -> Self {
         Self::Num(value)
+    }
+
+    fn local_var(offset: usize) -> Self {
+        Self::LocalVar { offset }
     }
 
     fn arith_op(value: ArithOp, lhs: Node, rhs: Node) -> Self {
@@ -88,6 +96,7 @@ pub enum ArithOp {
     Sub,
     Mul,
     Div,
+    Assign,
 }
 
 impl fmt::Display for ArithOp {
@@ -100,6 +109,7 @@ impl fmt::Display for ArithOp {
                 ArithOp::Sub => "sub",
                 ArithOp::Mul => "imul",
                 ArithOp::Div => "idiv",
+                ArithOp::Assign => "mov",
             }
         )
     }
@@ -119,17 +129,72 @@ impl From<&TokenKind> for ArithOp {
     }
 }
 
-pub fn parse(tokens: Tokens) -> Node {
+pub fn parse(tokens: Tokens) -> Vec<Node> {
     let mut tokens = tokens.into_iter().peekable();
 
-    expr(&mut tokens)
+    program(&mut tokens)
+}
+
+fn program<'a, I>(tokens: &mut Peekable<I>) -> Vec<Node>
+where
+    I: Iterator<Item = Token<'a>>,
+{
+    let mut nodes = vec![];
+
+    while tokens.peek().is_some() {
+        nodes.push(stmt(tokens));
+    }
+
+    nodes
+}
+
+fn stmt<'a, I>(tokens: &mut Peekable<I>) -> Node
+where
+    I: Iterator<Item = Token<'a>>,
+{
+    let node = expr(tokens);
+
+    match tokens.next() {
+        Some(Token {
+            value: TokenKind::Symbol(Symbol::SemiColon),
+            ..
+        }) => {
+            // Do nothing
+        }
+        token => {
+            invalid_token(token, Some("Must be ;"));
+        }
+    }
+
+    node
 }
 
 fn expr<'a, I>(tokens: &mut Peekable<I>) -> Node
 where
     I: Iterator<Item = Token<'a>>,
 {
-    equality(tokens)
+    assign(tokens)
+}
+
+fn assign<'a, I>(tokens: &mut Peekable<I>) -> Node
+where
+    I: Iterator<Item = Token<'a>>,
+{
+    let mut node = equality(tokens);
+
+    while let Some(token) = tokens.peek() {
+        match token.value {
+            TokenKind::Symbol(Symbol::Assign) => {
+                tokens.next().unwrap();
+                node = Node::arith_op(ArithOp::Assign, node, assign(tokens));
+            }
+            _ => {
+                break;
+            }
+        }
+    }
+
+    node
 }
 
 fn equality<'a, I>(tokens: &mut Peekable<I>) -> Node
@@ -269,6 +334,13 @@ where
             ..
         }) => Node::num(num),
         Some(Token {
+            value: TokenKind::Ident(ident),
+            ..
+        }) => {
+            let offset = (ident.chars().next().unwrap() as usize - 'a' as usize + 1) * 8;
+            Node::local_var(offset)
+        }
+        Some(Token {
             value: TokenKind::Symbol(Symbol::LParen),
             ..
         }) => {
@@ -306,9 +378,10 @@ fn invalid_token(token: Option<Token>, message: Option<&str>) -> ! {
                 },
             );
         }
-        None => {
-            panic!("Unexpected EOF");
-        }
+        None => match message {
+            Some(message) => panic!("{}", message),
+            None => panic!("Unexpected EOF"),
+        },
     }
 }
 
@@ -322,22 +395,22 @@ mod tests {
 
     #[test]
     fn test_ok_parse_single() -> Result<()> {
-        let tokens = lexer::tokenize("1")?;
+        let tokens = lexer::tokenize("1;")?;
         let actual = parse(tokens);
 
-        assert_eq!(actual, Node::num(1));
+        assert_eq!(actual, vec![Node::num(1)]);
 
         Ok(())
     }
 
     #[test]
     fn test_ok_parse_complex() -> Result<()> {
-        let tokens = lexer::tokenize("(+1 + -2) * 3 - 4 / 5")?;
+        let tokens = lexer::tokenize("(+1 + -2) * 3 - 4 / 5;")?;
         let actual = parse(tokens);
 
         assert_eq!(
             actual,
-            Node::arith_op(
+            vec![Node::arith_op(
                 ArithOp::Sub,
                 Node::arith_op(
                     ArithOp::Mul,
@@ -349,7 +422,7 @@ mod tests {
                     Node::num(3),
                 ),
                 Node::arith_op(ArithOp::Div, Node::num(4), Node::num(5))
-            )
+            )]
         );
 
         Ok(())
@@ -357,12 +430,12 @@ mod tests {
 
     #[test]
     fn test_ok_with_cmp() -> Result<()> {
-        let tokens = lexer::tokenize("(1 + 2 * 3 > 4) != (5 < 6 == 7 >= 8)")?;
+        let tokens = lexer::tokenize("(1 + 2 * 3 > 4) != (5 < 6 == 7 >= 8);")?;
         let actual = parse(tokens);
 
         assert_eq!(
             actual,
-            Node::cmp_op(
+            vec![Node::cmp_op(
                 CmpOp::Neq,
                 Node::cmp_op(
                     CmpOp::Lt,
@@ -378,7 +451,31 @@ mod tests {
                     Node::cmp_op(CmpOp::Lt, Node::num(5), Node::num(6)),
                     Node::cmp_op(CmpOp::Lte, Node::num(8), Node::num(7),)
                 )
-            )
+            )]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_ok_with_assign() -> Result<()> {
+        let tokens = lexer::tokenize("a = 1 + 2 * 3; b = a;")?;
+        let actual = parse(tokens);
+
+        assert_eq!(
+            actual,
+            vec![
+                Node::arith_op(
+                    ArithOp::Assign,
+                    Node::local_var(8),
+                    Node::arith_op(
+                        ArithOp::Add,
+                        Node::num(1),
+                        Node::arith_op(ArithOp::Mul, Node::num(2), Node::num(3))
+                    )
+                ),
+                Node::arith_op(ArithOp::Assign, Node::local_var(16), Node::local_var(8))
+            ]
         );
 
         Ok(())

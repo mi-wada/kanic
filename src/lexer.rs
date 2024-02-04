@@ -44,12 +44,17 @@ impl<'a> Token<'a> {
     pub fn num(num: i64, code_location: usize, user_input: &'a str) -> Self {
         Self::new(TokenKind::Num(num), code_location, user_input)
     }
+
+    pub fn ident(ident: String, code_location: usize, user_input: &'a str) -> Self {
+        Self::new(TokenKind::Ident(ident), code_location, user_input)
+    }
 }
 
 #[derive(PartialEq, Debug)]
 pub enum TokenKind {
     Symbol(Symbol),
     Num(i64),
+    Ident(String),
 }
 
 #[derive(PartialEq, Debug)]
@@ -73,6 +78,8 @@ pub enum Symbol {
     Gte,
     Eq,
     Neq,
+    Assign,
+    SemiColon,
 }
 
 impl From<&str> for Symbol {
@@ -98,6 +105,8 @@ impl From<char> for Symbol {
             ')' => Self::RParen,
             '<' => Self::Lt,
             '>' => Self::Gt,
+            '=' => Self::Assign,
+            ';' => Self::SemiColon,
             _ => panic!("Invalid symbol"),
         }
     }
@@ -113,7 +122,7 @@ pub fn tokenize(s: &str) -> Result<Tokens> {
             ' ' | '\n' | '\r' => {
                 continue;
             }
-            '+' | '-' | '*' | '/' | '(' | ')' => {
+            '+' | '-' | '*' | '/' | '(' | ')' | ';' => {
                 tokens.push(Token::symbol(Symbol::from(char), code_location, s))
             }
             '<' | '>' => {
@@ -131,7 +140,7 @@ pub fn tokenize(s: &str) -> Result<Tokens> {
                     _ => tokens.push(Token::symbol(Symbol::from(char), code_location, s)),
                 }
             }
-            '=' | '!' => {
+            '=' => {
                 let next_char = chars.peek().map(|&(_, c)| c);
 
                 match (char, next_char) {
@@ -139,6 +148,15 @@ pub fn tokenize(s: &str) -> Result<Tokens> {
                         chars.next();
                         tokens.push(Token::symbol(Symbol::Eq, code_location, s))
                     }
+                    _ => {
+                        tokens.push(Token::symbol(Symbol::Assign, code_location, s));
+                    }
+                }
+            }
+            '!' => {
+                let next_char = chars.peek().map(|&(_, c)| c);
+
+                match (char, next_char) {
                     ('!', Some('=')) => {
                         chars.next();
                         tokens.push(Token::symbol(Symbol::Neq, code_location, s))
@@ -163,6 +181,7 @@ pub fn tokenize(s: &str) -> Result<Tokens> {
 
                 tokens.push(Token::num(numbers.parse().unwrap(), code_location, s))
             }
+            'a'..='z' => tokens.push(Token::ident(char.into(), code_location, s)),
             _ => {
                 error_reporter::report(s, code_location, "Invalid token");
             }
@@ -223,6 +242,49 @@ mod tests {
         assert_eq!(actual.next(), Some(Token::num(6, 23, c_code)));
         assert_eq!(actual.next(), Some(Token::symbol(Symbol::Neq, 25, c_code)));
         assert_eq!(actual.next(), Some(Token::num(7, 28, c_code)));
+        assert_eq!(actual.next(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_ok_assign() -> Result<()> {
+        let c_code = "a = 1; b = 2; c = a + b;";
+        let mut actual = tokenize(c_code)?.into_iter();
+
+        assert_eq!(actual.next(), Some(Token::ident("a".into(), 0, c_code)));
+        assert_eq!(
+            actual.next(),
+            Some(Token::symbol(Symbol::Assign, 2, c_code))
+        );
+        assert_eq!(actual.next(), Some(Token::num(1, 4, c_code)));
+        assert_eq!(
+            actual.next(),
+            Some(Token::symbol(Symbol::SemiColon, 5, c_code))
+        );
+        assert_eq!(actual.next(), Some(Token::ident("b".into(), 7, c_code)));
+        assert_eq!(
+            actual.next(),
+            Some(Token::symbol(Symbol::Assign, 9, c_code))
+        );
+        assert_eq!(actual.next(), Some(Token::num(2, 11, c_code)));
+        assert_eq!(
+            actual.next(),
+            Some(Token::symbol(Symbol::SemiColon, 12, c_code))
+        );
+        assert_eq!(actual.next(), Some(Token::ident("c".into(), 14, c_code)));
+        assert_eq!(
+            actual.next(),
+            Some(Token::symbol(Symbol::Assign, 16, c_code))
+        );
+        assert_eq!(actual.next(), Some(Token::ident("a".into(), 18, c_code)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Add, 20, c_code)));
+        assert_eq!(actual.next(), Some(Token::ident("b".into(), 22, c_code)));
+        assert_eq!(
+            actual.next(),
+            Some(Token::symbol(Symbol::SemiColon, 23, c_code))
+        );
+        assert_eq!(actual.next(), None);
 
         Ok(())
     }
