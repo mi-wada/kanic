@@ -181,7 +181,21 @@ pub fn tokenize(s: &str) -> Result<Tokens> {
 
                 tokens.push(Token::num(numbers.parse().unwrap(), code_location, s))
             }
-            'a'..='z' => tokens.push(Token::ident(char.into(), code_location, s)),
+            'a'..='z' | 'A'..='Z' | '_' => {
+                let mut ident = String::new();
+                ident.push(char);
+
+                while let Some(&(_, next_char)) = chars.peek() {
+                    if next_char.is_ascii_alphanumeric() || next_char == '_' {
+                        ident.push(next_char);
+                        chars.next();
+                    } else {
+                        break;
+                    }
+                }
+
+                tokens.push(Token::ident(ident, code_location, s))
+            }
             _ => {
                 error_reporter::report(s, code_location, "Invalid token");
             }
@@ -249,7 +263,7 @@ mod tests {
 
     #[test]
     fn test_ok_assign() -> Result<()> {
-        let c_code = "a = 1; b = 2; c = a + b;";
+        let c_code = "a = 1; bar = 2; car = a + bar;";
         let mut actual = tokenize(c_code)?.into_iter();
 
         assert_eq!(actual.next(), Some(Token::ident("a".into(), 0, c_code)));
@@ -262,27 +276,27 @@ mod tests {
             actual.next(),
             Some(Token::symbol(Symbol::SemiColon, 5, c_code))
         );
-        assert_eq!(actual.next(), Some(Token::ident("b".into(), 7, c_code)));
+        assert_eq!(actual.next(), Some(Token::ident("bar".into(), 7, c_code)));
         assert_eq!(
             actual.next(),
-            Some(Token::symbol(Symbol::Assign, 9, c_code))
+            Some(Token::symbol(Symbol::Assign, 11, c_code))
         );
-        assert_eq!(actual.next(), Some(Token::num(2, 11, c_code)));
+        assert_eq!(actual.next(), Some(Token::num(2, 13, c_code)));
         assert_eq!(
             actual.next(),
-            Some(Token::symbol(Symbol::SemiColon, 12, c_code))
+            Some(Token::symbol(Symbol::SemiColon, 14, c_code))
         );
-        assert_eq!(actual.next(), Some(Token::ident("c".into(), 14, c_code)));
+        assert_eq!(actual.next(), Some(Token::ident("car".into(), 16, c_code)));
         assert_eq!(
             actual.next(),
-            Some(Token::symbol(Symbol::Assign, 16, c_code))
+            Some(Token::symbol(Symbol::Assign, 20, c_code))
         );
-        assert_eq!(actual.next(), Some(Token::ident("a".into(), 18, c_code)));
-        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Add, 20, c_code)));
-        assert_eq!(actual.next(), Some(Token::ident("b".into(), 22, c_code)));
+        assert_eq!(actual.next(), Some(Token::ident("a".into(), 22, c_code)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Add, 24, c_code)));
+        assert_eq!(actual.next(), Some(Token::ident("bar".into(), 26, c_code)));
         assert_eq!(
             actual.next(),
-            Some(Token::symbol(Symbol::SemiColon, 23, c_code))
+            Some(Token::symbol(Symbol::SemiColon, 29, c_code))
         );
         assert_eq!(actual.next(), None);
 

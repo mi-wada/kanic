@@ -4,7 +4,7 @@ use crate::{
 };
 
 use core::fmt;
-use std::iter::Peekable;
+use std::{collections::HashMap, iter::Peekable};
 
 #[derive(Debug, PartialEq)]
 pub enum Node {
@@ -129,30 +129,46 @@ impl From<&TokenKind> for ArithOp {
     }
 }
 
+struct ParserContext {
+    local_variables: HashMap<String, LocalVariable>,
+}
+
+impl ParserContext {
+    fn new() -> Self {
+        Self {
+            local_variables: HashMap::new(),
+        }
+    }
+}
+
+struct LocalVariable {
+    offset: usize,
+}
+
 pub fn parse(tokens: Tokens) -> Vec<Node> {
     let mut tokens = tokens.into_iter().peekable();
 
-    program(&mut tokens)
+    program(&mut tokens, &mut ParserContext::new())
 }
 
-fn program<'a, I>(tokens: &mut Peekable<I>) -> Vec<Node>
+fn program<'a, I>(tokens: &mut Peekable<I>, ctx: &mut ParserContext) -> Vec<Node>
 where
     I: Iterator<Item = Token<'a>>,
 {
     let mut nodes = vec![];
 
     while tokens.peek().is_some() {
-        nodes.push(stmt(tokens));
+        nodes.push(stmt(tokens, ctx));
     }
 
     nodes
 }
 
-fn stmt<'a, I>(tokens: &mut Peekable<I>) -> Node
+fn stmt<'a, I>(tokens: &mut Peekable<I>, ctx: &mut ParserContext) -> Node
 where
     I: Iterator<Item = Token<'a>>,
 {
-    let node = expr(tokens);
+    let node = expr(tokens, ctx);
 
     match tokens.next() {
         Some(Token {
@@ -169,24 +185,24 @@ where
     node
 }
 
-fn expr<'a, I>(tokens: &mut Peekable<I>) -> Node
+fn expr<'a, I>(tokens: &mut Peekable<I>, ctx: &mut ParserContext) -> Node
 where
     I: Iterator<Item = Token<'a>>,
 {
-    assign(tokens)
+    assign(tokens, ctx)
 }
 
-fn assign<'a, I>(tokens: &mut Peekable<I>) -> Node
+fn assign<'a, I>(tokens: &mut Peekable<I>, ctx: &mut ParserContext) -> Node
 where
     I: Iterator<Item = Token<'a>>,
 {
-    let mut node = equality(tokens);
+    let mut node = equality(tokens, ctx);
 
     while let Some(token) = tokens.peek() {
         match token.value {
             TokenKind::Symbol(Symbol::Assign) => {
                 tokens.next().unwrap();
-                node = Node::arith_op(ArithOp::Assign, node, assign(tokens));
+                node = Node::arith_op(ArithOp::Assign, node, assign(tokens, ctx));
             }
             _ => {
                 break;
@@ -197,11 +213,11 @@ where
     node
 }
 
-fn equality<'a, I>(tokens: &mut Peekable<I>) -> Node
+fn equality<'a, I>(tokens: &mut Peekable<I>, ctx: &mut ParserContext) -> Node
 where
     I: Iterator<Item = Token<'a>>,
 {
-    let mut node = relational(tokens);
+    let mut node = relational(tokens, ctx);
 
     while let Some(token) = tokens.peek() {
         match token.value {
@@ -209,7 +225,7 @@ where
                 node = Node::cmp_op(
                     CmpOp::from(&tokens.next().unwrap().value),
                     node,
-                    relational(tokens),
+                    relational(tokens, ctx),
                 )
             }
             _ => {
@@ -221,11 +237,11 @@ where
     node
 }
 
-fn relational<'a, I>(tokens: &mut Peekable<I>) -> Node
+fn relational<'a, I>(tokens: &mut Peekable<I>, ctx: &mut ParserContext) -> Node
 where
     I: Iterator<Item = Token<'a>>,
 {
-    let mut node = add(tokens);
+    let mut node = add(tokens, ctx);
 
     while let Some(token) = tokens.peek() {
         match token.value {
@@ -233,16 +249,16 @@ where
                 node = Node::cmp_op(
                     CmpOp::from(&tokens.next().unwrap().value),
                     node,
-                    add(tokens),
+                    add(tokens, ctx),
                 )
             }
             TokenKind::Symbol(Symbol::Gt) => {
                 tokens.next().unwrap();
-                node = Node::cmp_op(CmpOp::Lt, add(tokens), node);
+                node = Node::cmp_op(CmpOp::Lt, add(tokens, ctx), node);
             }
             TokenKind::Symbol(Symbol::Gte) => {
                 tokens.next().unwrap();
-                node = Node::cmp_op(CmpOp::Lte, add(tokens), node);
+                node = Node::cmp_op(CmpOp::Lte, add(tokens, ctx), node);
             }
             _ => {
                 break;
@@ -253,11 +269,11 @@ where
     node
 }
 
-fn add<'a, I>(tokens: &mut Peekable<I>) -> Node
+fn add<'a, I>(tokens: &mut Peekable<I>, ctx: &mut ParserContext) -> Node
 where
     I: Iterator<Item = Token<'a>>,
 {
-    let mut node = mul(tokens);
+    let mut node = mul(tokens, ctx);
 
     while let Some(token) = tokens.peek() {
         match token.value {
@@ -265,7 +281,7 @@ where
                 node = Node::arith_op(
                     ArithOp::from(&tokens.next().unwrap().value),
                     node,
-                    mul(tokens),
+                    mul(tokens, ctx),
                 )
             }
             _ => {
@@ -277,11 +293,11 @@ where
     node
 }
 
-fn mul<'a, I>(tokens: &mut Peekable<I>) -> Node
+fn mul<'a, I>(tokens: &mut Peekable<I>, ctx: &mut ParserContext) -> Node
 where
     I: Iterator<Item = Token<'a>>,
 {
-    let mut node = unary(tokens);
+    let mut node = unary(tokens, ctx);
 
     while let Some(token) = tokens.peek() {
         match token.value {
@@ -289,7 +305,7 @@ where
                 node = Node::arith_op(
                     ArithOp::from(&tokens.next().unwrap().value),
                     node,
-                    unary(tokens),
+                    unary(tokens, ctx),
                 )
             }
             _ => {
@@ -301,7 +317,7 @@ where
     node
 }
 
-fn unary<'a, I>(tokens: &mut Peekable<I>) -> Node
+fn unary<'a, I>(tokens: &mut Peekable<I>, ctx: &mut ParserContext) -> Node
 where
     I: Iterator<Item = Token<'a>>,
 {
@@ -311,20 +327,20 @@ where
             ..
         }) => {
             tokens.next().unwrap();
-            primary(tokens)
+            primary(tokens, ctx)
         }
         Some(Token {
             value: TokenKind::Symbol(Symbol::Sub),
             ..
         }) => {
             tokens.next().unwrap();
-            Node::arith_op(ArithOp::Sub, Node::num(0), primary(tokens))
+            Node::arith_op(ArithOp::Sub, Node::num(0), primary(tokens, ctx))
         }
-        _ => primary(tokens),
+        _ => primary(tokens, ctx),
     }
 }
 
-fn primary<'a, I>(tokens: &mut Peekable<I>) -> Node
+fn primary<'a, I>(tokens: &mut Peekable<I>, ctx: &mut ParserContext) -> Node
 where
     I: Iterator<Item = Token<'a>>,
 {
@@ -337,14 +353,23 @@ where
             value: TokenKind::Ident(ident),
             ..
         }) => {
-            let offset = (ident.chars().next().unwrap() as usize - 'a' as usize + 1) * 8;
+            let offset = {
+                let current_max_offset = ctx.local_variables.len() * 8;
+
+                ctx.local_variables
+                    .entry(ident.to_string())
+                    .or_insert_with(|| LocalVariable {
+                        offset: current_max_offset + 8,
+                    })
+                    .offset
+            };
             Node::local_var(offset)
         }
         Some(Token {
             value: TokenKind::Symbol(Symbol::LParen),
             ..
         }) => {
-            let node = expr(tokens);
+            let node = expr(tokens, ctx);
 
             match tokens.next() {
                 Some(Token {
@@ -459,7 +484,7 @@ mod tests {
 
     #[test]
     fn test_ok_with_assign() -> Result<()> {
-        let tokens = lexer::tokenize("a = 1 + 2 * 3; b = a;")?;
+        let tokens = lexer::tokenize("a = 1 + 2 * 3; bar = a;")?;
         let actual = parse(tokens);
 
         assert_eq!(

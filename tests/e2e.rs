@@ -34,7 +34,7 @@ fn test_ok_cmp_false() {
 
 #[test]
 fn test_local_var() {
-    assert_exit_code("a = 3; b = 10; 3 * a + b;", 19);
+    assert_exit_code("a = 3; bar = 10; 3 * a + bar;", 19);
 }
 
 #[test]
