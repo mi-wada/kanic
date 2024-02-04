@@ -1,4 +1,7 @@
-use crate::lexer::{Symbol, Token, TokenKind, Tokens};
+use crate::{
+    error_reporter,
+    lexer::{Symbol, Token, TokenKind, Tokens},
+};
 
 use core::fmt;
 use std::iter::Peekable;
@@ -110,7 +113,7 @@ impl From<&TokenKind> for ArithOp {
             TokenKind::Symbol(Symbol::Mul) => Self::Mul,
             TokenKind::Symbol(Symbol::Div) => Self::Div,
             _ => {
-                panic!("Invalid token passed.")
+                panic!("Invalid token passed: {:?}", value);
             }
         }
     }
@@ -122,16 +125,16 @@ pub fn parse(tokens: Tokens) -> Node {
     expr(&mut tokens)
 }
 
-fn expr<I>(tokens: &mut Peekable<I>) -> Node
+fn expr<'a, I>(tokens: &mut Peekable<I>) -> Node
 where
-    I: Iterator<Item = Token>,
+    I: Iterator<Item = Token<'a>>,
 {
     equality(tokens)
 }
 
-fn equality<I>(tokens: &mut Peekable<I>) -> Node
+fn equality<'a, I>(tokens: &mut Peekable<I>) -> Node
 where
-    I: Iterator<Item = Token>,
+    I: Iterator<Item = Token<'a>>,
 {
     let mut node = relational(tokens);
 
@@ -153,9 +156,9 @@ where
     node
 }
 
-fn relational<I>(tokens: &mut Peekable<I>) -> Node
+fn relational<'a, I>(tokens: &mut Peekable<I>) -> Node
 where
-    I: Iterator<Item = Token>,
+    I: Iterator<Item = Token<'a>>,
 {
     let mut node = add(tokens);
 
@@ -185,9 +188,9 @@ where
     node
 }
 
-fn add<I>(tokens: &mut Peekable<I>) -> Node
+fn add<'a, I>(tokens: &mut Peekable<I>) -> Node
 where
-    I: Iterator<Item = Token>,
+    I: Iterator<Item = Token<'a>>,
 {
     let mut node = mul(tokens);
 
@@ -209,9 +212,9 @@ where
     node
 }
 
-fn mul<I>(tokens: &mut Peekable<I>) -> Node
+fn mul<'a, I>(tokens: &mut Peekable<I>) -> Node
 where
-    I: Iterator<Item = Token>,
+    I: Iterator<Item = Token<'a>>,
 {
     let mut node = unary(tokens);
 
@@ -233,9 +236,9 @@ where
     node
 }
 
-fn unary<I>(tokens: &mut Peekable<I>) -> Node
+fn unary<'a, I>(tokens: &mut Peekable<I>) -> Node
 where
-    I: Iterator<Item = Token>,
+    I: Iterator<Item = Token<'a>>,
 {
     match tokens.peek() {
         Some(Token {
@@ -256,9 +259,9 @@ where
     }
 }
 
-fn primary<I>(tokens: &mut Peekable<I>) -> Node
+fn primary<'a, I>(tokens: &mut Peekable<I>) -> Node
 where
-    I: Iterator<Item = Token>,
+    I: Iterator<Item = Token<'a>>,
 {
     match tokens.next() {
         Some(Token {
@@ -271,20 +274,40 @@ where
         }) => {
             let node = expr(tokens);
 
-            if let Some(Token {
-                value: TokenKind::Symbol(Symbol::RParen),
-                ..
-            }) = tokens.next()
-            {
-                // Do nothing
-            } else {
-                panic!("Must be )");
+            match tokens.next() {
+                Some(Token {
+                    value: TokenKind::Symbol(Symbol::RParen),
+                    ..
+                }) => {
+                    // Do nothing
+                }
+                token => {
+                    invalid_token(token, Some("Must be )"));
+                }
             }
 
             node
         }
-        _ => {
-            panic!("Unexpected token");
+        token => {
+            invalid_token(token, None);
+        }
+    }
+}
+
+fn invalid_token(token: Option<Token>, message: Option<&str>) -> ! {
+    match token {
+        Some(Token { metadata, .. }) => {
+            error_reporter::report(
+                metadata.user_input,
+                metadata.code_location,
+                match message {
+                    Some(message) => message,
+                    None => "Invalid token",
+                },
+            );
+        }
+        None => {
+            panic!("Unexpected EOF");
         }
     }
 }

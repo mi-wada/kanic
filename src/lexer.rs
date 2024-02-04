@@ -1,47 +1,48 @@
-
-
 use anyhow::Result;
 
 use crate::error_reporter;
 
 #[derive(PartialEq, Debug)]
-pub struct Tokens(Vec<Token>);
+pub struct Tokens<'a>(Vec<Token<'a>>);
 
-impl IntoIterator for Tokens {
-    type Item = Token;
-    type IntoIter = std::vec::IntoIter<Token>;
+impl<'a> IntoIterator for Tokens<'a> {
+    type Item = Token<'a>;
+    type IntoIter = std::vec::IntoIter<Token<'a>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-impl Tokens {
-    fn push(&mut self, token: Token) {
+impl<'a> Tokens<'a> {
+    fn push(&mut self, token: Token<'a>) {
         self.0.push(token);
     }
 }
 
 #[derive(PartialEq, Debug)]
-pub struct Token {
+pub struct Token<'a> {
     pub value: TokenKind,
-    pub metadata: TokenMetadata,
+    pub metadata: TokenMetadata<'a>,
 }
 
-impl Token {
-    fn new(value: TokenKind, code_location: usize) -> Self {
+impl<'a> Token<'a> {
+    fn new(value: TokenKind, code_location: usize, user_input: &'a str) -> Self {
         Self {
             value,
-            metadata: TokenMetadata { code_location },
+            metadata: TokenMetadata {
+                code_location,
+                user_input,
+            },
         }
     }
 
-    pub fn symbol(symbol_kind: Symbol, code_location: usize) -> Self {
-        Self::new(TokenKind::Symbol(symbol_kind), code_location)
+    pub fn symbol(symbol_kind: Symbol, code_location: usize, user_input: &'a str) -> Self {
+        Self::new(TokenKind::Symbol(symbol_kind), code_location, user_input)
     }
 
-    pub fn num(num: i64, code_location: usize) -> Self {
-        Self::new(TokenKind::Num(num), code_location)
+    pub fn num(num: i64, code_location: usize, user_input: &'a str) -> Self {
+        Self::new(TokenKind::Num(num), code_location, user_input)
     }
 }
 
@@ -52,9 +53,10 @@ pub enum TokenKind {
 }
 
 #[derive(PartialEq, Debug)]
-pub struct TokenMetadata {
+pub struct TokenMetadata<'a> {
     // Indicates how many bytes of the source code the token starts from.
     pub code_location: usize,
+    pub user_input: &'a str,
 }
 
 #[derive(PartialEq, Debug)]
@@ -76,15 +78,7 @@ pub enum Symbol {
 impl From<&str> for Symbol {
     fn from(value: &str) -> Self {
         match value {
-            "+" => Self::Add,
-            "-" => Self::Sub,
-            "*" => Self::Mul,
-            "/" => Self::Div,
-            "(" => Self::LParen,
-            ")" => Self::RParen,
-            "<" => Self::Lt,
             "<=" => Self::Lte,
-            ">" => Self::Gt,
             ">=" => Self::Gte,
             "==" => Self::Eq,
             "!=" => Self::Neq,
@@ -120,7 +114,7 @@ pub fn tokenize(s: &str) -> Result<Tokens> {
                 continue;
             }
             '+' | '-' | '*' | '/' | '(' | ')' => {
-                tokens.push(Token::symbol(Symbol::from(char), code_location))
+                tokens.push(Token::symbol(Symbol::from(char), code_location, s))
             }
             '<' | '>' => {
                 let next_char = chars.peek().map(|&(_, c)| c);
@@ -128,13 +122,13 @@ pub fn tokenize(s: &str) -> Result<Tokens> {
                 match (char, next_char) {
                     ('<', Some('=')) => {
                         chars.next();
-                        tokens.push(Token::symbol(Symbol::Lte, code_location))
+                        tokens.push(Token::symbol(Symbol::Lte, code_location, s))
                     }
                     ('>', Some('=')) => {
                         chars.next();
-                        tokens.push(Token::symbol(Symbol::Gte, code_location))
+                        tokens.push(Token::symbol(Symbol::Gte, code_location, s))
                     }
-                    _ => tokens.push(Token::symbol(Symbol::from(char), code_location)),
+                    _ => tokens.push(Token::symbol(Symbol::from(char), code_location, s)),
                 }
             }
             '=' | '!' => {
@@ -143,11 +137,11 @@ pub fn tokenize(s: &str) -> Result<Tokens> {
                 match (char, next_char) {
                     ('=', Some('=')) => {
                         chars.next();
-                        tokens.push(Token::symbol(Symbol::Eq, code_location))
+                        tokens.push(Token::symbol(Symbol::Eq, code_location, s))
                     }
                     ('!', Some('=')) => {
                         chars.next();
-                        tokens.push(Token::symbol(Symbol::Neq, code_location))
+                        tokens.push(Token::symbol(Symbol::Neq, code_location, s))
                     }
                     _ => {
                         error_reporter::report(s, code_location, "Invalid token");
@@ -167,7 +161,7 @@ pub fn tokenize(s: &str) -> Result<Tokens> {
                     }
                 }
 
-                tokens.push(Token::num(numbers.parse().unwrap(), code_location))
+                tokens.push(Token::num(numbers.parse().unwrap(), code_location, s))
             }
             _ => {
                 error_reporter::report(s, code_location, "Invalid token");
@@ -184,21 +178,28 @@ mod tests {
 
     #[test]
     fn test_success() -> Result<()> {
-        let mut actual = tokenize("(+1 + -2) * 3 - 4 / 5")?.into_iter();
+        let c_code = "(+1 + -2) * 3 - 4 / 5";
+        let mut actual = tokenize(c_code)?.into_iter();
 
-        assert_eq!(actual.next(), Some(Token::symbol(Symbol::LParen, 0)));
-        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Add, 1)));
-        assert_eq!(actual.next(), Some(Token::num(1, 2)));
-        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Add, 4)));
-        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Sub, 6)));
-        assert_eq!(actual.next(), Some(Token::num(2, 7)));
-        assert_eq!(actual.next(), Some(Token::symbol(Symbol::RParen, 8)));
-        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Mul, 10)));
-        assert_eq!(actual.next(), Some(Token::num(3, 12)));
-        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Sub, 14)));
-        assert_eq!(actual.next(), Some(Token::num(4, 16)));
-        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Div, 18)));
-        assert_eq!(actual.next(), Some(Token::num(5, 20)));
+        assert_eq!(
+            actual.next(),
+            Some(Token::symbol(Symbol::LParen, 0, c_code))
+        );
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Add, 1, c_code)));
+        assert_eq!(actual.next(), Some(Token::num(1, 2, c_code)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Add, 4, c_code)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Sub, 6, c_code)));
+        assert_eq!(actual.next(), Some(Token::num(2, 7, c_code)));
+        assert_eq!(
+            actual.next(),
+            Some(Token::symbol(Symbol::RParen, 8, c_code))
+        );
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Mul, 10, c_code)));
+        assert_eq!(actual.next(), Some(Token::num(3, 12, c_code)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Sub, 14, c_code)));
+        assert_eq!(actual.next(), Some(Token::num(4, 16, c_code)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Div, 18, c_code)));
+        assert_eq!(actual.next(), Some(Token::num(5, 20, c_code)));
         assert_eq!(actual.next(), None);
 
         Ok(())
@@ -206,21 +207,22 @@ mod tests {
 
     #[test]
     fn test_success_with_comparison_operator() -> Result<()> {
-        let mut actual = tokenize("1 < 2 <= 3 > 4 >= 5 == 6 != 7")?.into_iter();
+        let c_code = "1 < 2 <= 3 > 4 >= 5 == 6 != 7";
+        let mut actual = tokenize(c_code)?.into_iter();
 
-        assert_eq!(actual.next(), Some(Token::num(1, 0)));
-        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Lt, 2)));
-        assert_eq!(actual.next(), Some(Token::num(2, 4)));
-        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Lte, 6)));
-        assert_eq!(actual.next(), Some(Token::num(3, 9)));
-        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Gt, 11)));
-        assert_eq!(actual.next(), Some(Token::num(4, 13)));
-        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Gte, 15)));
-        assert_eq!(actual.next(), Some(Token::num(5, 18)));
-        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Eq, 20)));
-        assert_eq!(actual.next(), Some(Token::num(6, 23)));
-        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Neq, 25)));
-        assert_eq!(actual.next(), Some(Token::num(7, 28)));
+        assert_eq!(actual.next(), Some(Token::num(1, 0, c_code)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Lt, 2, c_code)));
+        assert_eq!(actual.next(), Some(Token::num(2, 4, c_code)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Lte, 6, c_code)));
+        assert_eq!(actual.next(), Some(Token::num(3, 9, c_code)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Gt, 11, c_code)));
+        assert_eq!(actual.next(), Some(Token::num(4, 13, c_code)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Gte, 15, c_code)));
+        assert_eq!(actual.next(), Some(Token::num(5, 18, c_code)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Eq, 20, c_code)));
+        assert_eq!(actual.next(), Some(Token::num(6, 23, c_code)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Neq, 25, c_code)));
+        assert_eq!(actual.next(), Some(Token::num(7, 28, c_code)));
 
         Ok(())
     }
