@@ -109,29 +109,6 @@ impl From<char> for Symbol {
     }
 }
 
-impl fmt::Display for Symbol {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Symbol::Add => "add",
-                Symbol::Sub => "sub",
-                Symbol::Mul => "mul",
-                Symbol::Div => "div",
-                Symbol::LParen => "",
-                Symbol::RParen => "",
-                Symbol::Lt => "setl",
-                Symbol::Lte => "setle",
-                Symbol::Gt => panic!("Use Lt"),
-                Symbol::Gte => panic!("Use Lte"),
-                Symbol::Eq => "sete",
-                Symbol::Neq => "setne",
-            }
-        )
-    }
-}
-
 pub fn tokenize(s: &str) -> Result<Tokens> {
     let mut tokens = Tokens(vec![]);
 
