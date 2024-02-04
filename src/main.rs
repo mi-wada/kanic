@@ -1,4 +1,4 @@
-use std::{env::args, fmt::format};
+use std::env::args;
 
 use anyhow::Result;
 use parser::{ArithOp, Node};
