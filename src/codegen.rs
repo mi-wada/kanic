@@ -13,7 +13,6 @@ pub fn generate(c_code: &str) -> Result<String> {
 main:
         push rbp
         mov rbp, rsp
-        sub rsp, 208
 ",
     ) + &nodes_to_asem(&parser::parse(lexer::tokenize(c_code)?))?)
 }
