@@ -84,6 +84,7 @@ pub enum Symbol {
     If,
     Else,
     While,
+    For,
 }
 
 impl From<&str> for Symbol {
@@ -97,6 +98,7 @@ impl From<&str> for Symbol {
             "if" => Self::If,
             "else" => Self::Else,
             "while" => Self::While,
+            "for" => Self::For,
             _ => panic!("Invalid symbol"),
         }
     }
@@ -207,6 +209,7 @@ pub fn tokenize(s: &str) -> Result<Tokens> {
                     "if" => tokens.push(Token::symbol(Symbol::If, code_location, s)),
                     "else" => tokens.push(Token::symbol(Symbol::Else, code_location, s)),
                     "while" => tokens.push(Token::symbol(Symbol::While, code_location, s)),
+                    "for" => tokens.push(Token::symbol(Symbol::For, code_location, s)),
                     _ => tokens.push(Token::ident(str, code_location, s)),
                 }
             }
@@ -380,6 +383,56 @@ mod tests {
         assert_eq!(
             actual.next(),
             Some(Token::symbol(Symbol::SemiColon, 22, c_code))
+        );
+        assert_eq!(actual.next(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_ok_for() -> Result<()> {
+        let c_code = "for (i = 0; i < 10; i = i + 1) return i;";
+        let mut actual = tokenize(c_code)?.into_iter();
+
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::For, 0, c_code)));
+        assert_eq!(
+            actual.next(),
+            Some(Token::symbol(Symbol::LParen, 4, c_code))
+        );
+        assert_eq!(actual.next(), Some(Token::ident("i".into(), 5, c_code)));
+        assert_eq!(
+            actual.next(),
+            Some(Token::symbol(Symbol::Assign, 7, c_code))
+        );
+        assert_eq!(actual.next(), Some(Token::num(0, 9, c_code)));
+        assert_eq!(
+            actual.next(),
+            Some(Token::symbol(Symbol::SemiColon, 10, c_code))
+        );
+        assert_eq!(actual.next(), Some(Token::ident("i".into(), 12, c_code)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Lt, 14, c_code)));
+        assert_eq!(actual.next(), Some(Token::num(10, 16, c_code)));
+        assert_eq!(
+            actual.next(),
+            Some(Token::symbol(Symbol::SemiColon, 18, c_code))
+        );
+        assert_eq!(actual.next(), Some(Token::ident("i".into(), 20, c_code)));
+        assert_eq!(
+            actual.next(),
+            Some(Token::symbol(Symbol::Assign, 22, c_code))
+        );
+        assert_eq!(actual.next(), Some(Token::ident("i".into(), 24, c_code)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Add, 26, c_code)));
+        assert_eq!(actual.next(), Some(Token::num(1, 28, c_code)));
+        assert_eq!(
+            actual.next(),
+            Some(Token::symbol(Symbol::RParen, 29, c_code))
+        );
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Ret, 31, c_code)));
+        assert_eq!(actual.next(), Some(Token::ident("i".into(), 38, c_code)));
+        assert_eq!(
+            actual.next(),
+            Some(Token::symbol(Symbol::SemiColon, 39, c_code))
         );
         assert_eq!(actual.next(), None);
 

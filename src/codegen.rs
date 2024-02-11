@@ -135,5 +135,41 @@ fn to_asem(ast: &Node) -> Result<String> {
                 "{end_label}:
 "
             )),
+        Node::For {
+            start_label,
+            end_label,
+            init,
+            cond,
+            update,
+            then,
+        } => {
+            Ok(match init {
+                Some(init) => to_asem(init.as_ref())?,
+                None => "".to_string(),
+            } + &format!(
+                "{start_label}:
+    "
+            ) + &(match cond {
+                Some(cond) => to_asem(cond.as_ref())?,
+                // if no condition, it's an infinite loop
+                None => "        push 1".to_string(),
+            }) + &format!(
+                "        pop rax
+            cmp rax, 0
+            je {end_label}
+    "
+            ) + &(match update {
+                Some(update) => to_asem(update.as_ref())?,
+                None => "".to_string(),
+            }) + &to_asem(then.as_ref())?
+                + &format!(
+                    "        jmp {start_label}
+"
+                )
+                + &format!(
+                    "{end_label}:
+"
+                ))
+        }
     }
 }

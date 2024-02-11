@@ -28,6 +28,14 @@ pub enum Node {
         cond: NodeChild,
         then: NodeChild,
     },
+    For {
+        start_label: String,
+        end_label: String,
+        init: Option<NodeChild>,
+        cond: Option<NodeChild>,
+        update: Option<NodeChild>,
+        then: NodeChild,
+    },
     ArithOp {
         value: ArithOp,
         lhs: NodeChild,
@@ -71,6 +79,24 @@ impl Node {
             start_label,
             end_label,
             cond: Box::new(cond),
+            then: Box::new(then),
+        }
+    }
+
+    fn for_(
+        start_label: String,
+        end_label: String,
+        init: Option<Node>,
+        cond: Option<Node>,
+        update: Option<Node>,
+        then: Node,
+    ) -> Self {
+        Self::For {
+            start_label,
+            end_label,
+            init: init.map(Box::new),
+            cond: cond.map(Box::new),
+            update: update.map(Box::new),
             then: Box::new(then),
         }
     }
@@ -267,6 +293,45 @@ where
             let then = stmt(tokens, ctx);
 
             return Node::while_(ctx.new_label(), ctx.new_label(), cond, then);
+        }
+        Some(Token {
+            value: TokenKind::Symbol(Symbol::For),
+            ..
+        }) => {
+            tokens.next().unwrap();
+
+            consume(tokens, TokenKind::Symbol(Symbol::LParen));
+
+            let init = match tokens.peek() {
+                Some(Token {
+                    value: TokenKind::Symbol(Symbol::SemiColon),
+                    ..
+                }) => None,
+                _ => Some(expr(tokens, ctx)),
+            };
+            consume(tokens, TokenKind::Symbol(Symbol::SemiColon));
+
+            let cond = match tokens.peek() {
+                Some(Token {
+                    value: TokenKind::Symbol(Symbol::SemiColon),
+                    ..
+                }) => None,
+                _ => Some(expr(tokens, ctx)),
+            };
+            consume(tokens, TokenKind::Symbol(Symbol::SemiColon));
+
+            let update = match tokens.peek() {
+                Some(Token {
+                    value: TokenKind::Symbol(Symbol::RParen),
+                    ..
+                }) => None,
+                _ => Some(expr(tokens, ctx)),
+            };
+            consume(tokens, TokenKind::Symbol(Symbol::RParen));
+
+            let then = stmt(tokens, ctx);
+
+            return Node::for_(ctx.new_label(), ctx.new_label(), init, cond, update, then);
         }
         _ => expr(tokens, ctx),
     };
@@ -640,6 +705,34 @@ mod tests {
                 ".L1".to_string(),
                 Node::num(1),
                 Node::ret(Node::num(2))
+            )]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_ok_for() -> Result<()> {
+        let tokens = lexer::tokenize("for (i = 0; i < 10; i = i + 1) return i;")?;
+        let actual = parse(tokens);
+
+        assert_eq!(
+            actual,
+            vec![Node::for_(
+                ".L0".to_string(),
+                ".L1".to_string(),
+                Some(Node::arith_op(
+                    ArithOp::Assign,
+                    Node::local_var(8),
+                    Node::num(0)
+                )),
+                Some(Node::cmp_op(CmpOp::Lt, Node::local_var(8), Node::num(10))),
+                Some(Node::arith_op(
+                    ArithOp::Assign,
+                    Node::local_var(8),
+                    Node::arith_op(ArithOp::Add, Node::local_var(8), Node::num(1))
+                )),
+                Node::ret(Node::local_var(8))
             )]
         );
 

@@ -58,6 +58,14 @@ fn test_while() {
 }
 
 #[test]
+fn test_for() {
+    assert_exit_code(
+        "a = 0; for (b = 0; b < 10; b = b + 1) a = a + 1; return a;",
+        10,
+    );
+}
+
+#[test]
 fn test_ng_only_symbol() {
     let res = std::process::Command::new("target/debug/kanic")
         .arg("10 + 2 == == 2")
