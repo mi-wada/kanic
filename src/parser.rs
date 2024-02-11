@@ -22,6 +22,12 @@ pub enum Node {
         then: NodeChild,
         else_: Option<NodeChild>,
     },
+    While {
+        start_label: String,
+        end_label: String,
+        cond: NodeChild,
+        then: NodeChild,
+    },
     ArithOp {
         value: ArithOp,
         lhs: NodeChild,
@@ -57,6 +63,15 @@ impl Node {
             cond: Box::new(cond),
             then: Box::new(then),
             else_: else_.map(Box::new),
+        }
+    }
+
+    fn while_(start_label: String, end_label: String, cond: Node, then: Node) -> Self {
+        Self::While {
+            start_label,
+            end_label,
+            cond: Box::new(cond),
+            then: Box::new(then),
         }
     }
 
@@ -236,6 +251,22 @@ where
             };
 
             return Node::if_(ctx.new_label(), cond, then, else_);
+        }
+        Some(Token {
+            value: TokenKind::Symbol(Symbol::While),
+            ..
+        }) => {
+            tokens.next().unwrap();
+
+            consume(tokens, TokenKind::Symbol(Symbol::LParen));
+
+            let cond = expr(tokens, ctx);
+
+            consume(tokens, TokenKind::Symbol(Symbol::RParen));
+
+            let then = stmt(tokens, ctx);
+
+            return Node::while_(ctx.new_label(), ctx.new_label(), cond, then);
         }
         _ => expr(tokens, ctx),
     };
@@ -591,6 +622,24 @@ mod tests {
                 Node::num(1),
                 Node::ret(Node::num(2)),
                 Some(Node::ret(Node::num(3)))
+            )]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_ok_while() -> Result<()> {
+        let tokens = lexer::tokenize("while (1) return 2;")?;
+        let actual = parse(tokens);
+
+        assert_eq!(
+            actual,
+            vec![Node::while_(
+                ".L0".to_string(),
+                ".L1".to_string(),
+                Node::num(1),
+                Node::ret(Node::num(2))
             )]
         );
 

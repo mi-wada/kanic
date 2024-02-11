@@ -111,5 +111,29 @@ fn to_asem(ast: &Node) -> Result<String> {
                 Some(else_) => to_asem(else_.as_ref())?,
                 None => "".to_string(),
             })),
+        Node::While {
+            start_label,
+            end_label,
+            cond,
+            then,
+        } => Ok(format!(
+            "{start_label}:
+"
+        ) + &to_asem(cond.as_ref())?
+            + &format!(
+                "        pop rax
+        cmp rax, 0
+        je {end_label}
+"
+            )
+            + &to_asem(then.as_ref())?
+            + &format!(
+                "        jmp {start_label}
+"
+            )
+            + &format!(
+                "{end_label}:
+"
+            )),
     }
 }

@@ -53,6 +53,11 @@ fn test_if_eval_else() {
 }
 
 #[test]
+fn test_while() {
+    assert_exit_code("a = 0; while (a < 10) a = a + 1; return a;", 10);
+}
+
+#[test]
 fn test_ng_only_symbol() {
     let res = std::process::Command::new("target/debug/kanic")
         .arg("10 + 2 == == 2")
