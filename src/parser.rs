@@ -216,29 +216,11 @@ where
         }) => {
             tokens.next().unwrap();
 
-            // TODO: Refactor
-            // Consume (
-            if let Token {
-                value: TokenKind::Symbol(Symbol::LParen),
-                ..
-            } = tokens.next().unwrap()
-            {
-                // Do nothing
-            } else {
-                invalid_token(None, Some("Must be ("));
-            }
+            consume(tokens, TokenKind::Symbol(Symbol::LParen));
 
             let cond = expr(tokens, ctx);
 
-            if let Token {
-                value: TokenKind::Symbol(Symbol::RParen),
-                ..
-            } = tokens.next().unwrap()
-            {
-                // Do nothing
-            } else {
-                invalid_token(None, Some("Must be )"));
-            }
+            consume(tokens, TokenKind::Symbol(Symbol::RParen));
 
             let then = stmt(tokens, ctx);
 
@@ -258,17 +240,7 @@ where
         _ => expr(tokens, ctx),
     };
 
-    match tokens.next() {
-        Some(Token {
-            value: TokenKind::Symbol(Symbol::SemiColon),
-            ..
-        }) => {
-            // Do nothing
-        }
-        token => {
-            invalid_token(token, Some("Must be ;"));
-        }
-    }
+    consume(tokens, TokenKind::Symbol(Symbol::SemiColon));
 
     node
 }
@@ -459,17 +431,7 @@ where
         }) => {
             let node = expr(tokens, ctx);
 
-            match tokens.next() {
-                Some(Token {
-                    value: TokenKind::Symbol(Symbol::RParen),
-                    ..
-                }) => {
-                    // Do nothing
-                }
-                token => {
-                    invalid_token(token, Some("Must be )"));
-                }
-            }
+            consume(tokens, TokenKind::Symbol(Symbol::RParen));
 
             node
         }
@@ -495,6 +457,28 @@ fn invalid_token(token: Option<Token>, message: Option<&str>) -> ! {
             Some(message) => panic!("{}", message),
             None => panic!("Unexpected EOF"),
         },
+    }
+}
+
+fn consume<'a, I>(tokens: &mut Peekable<I>, expected_token_kind: TokenKind)
+where
+    I: Iterator<Item = Token<'a>>,
+{
+    let actual_token = match tokens.next() {
+        Some(token) => token,
+        None => {
+            invalid_token(
+                None,
+                Some(format!("Must be {:?}. Unexpected EOF", expected_token_kind).as_str()),
+            );
+        }
+    };
+
+    if actual_token.value != expected_token_kind {
+        invalid_token(
+            Some(actual_token),
+            Some(format!("Must be {:?}", expected_token_kind).as_str()),
+        );
     }
 }
 
