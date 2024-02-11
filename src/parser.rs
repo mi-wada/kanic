@@ -214,16 +214,31 @@ impl ParserContext {
         self.current_label_number += 1;
         label
     }
+
+    fn stack_size(&self) -> usize {
+        self.local_variables.len() * 8
+    }
 }
 
 struct LocalVariable {
     offset: usize,
 }
 
-pub fn parse(tokens: Tokens) -> Vec<Node> {
+pub struct ParseResult {
+    pub nodes: Vec<Node>,
+    pub stack_size: usize,
+}
+
+pub fn parse(tokens: Tokens) -> ParseResult {
     let mut tokens = tokens.into_iter().peekable();
 
-    program(&mut tokens, &mut ParserContext::new())
+    let mut parser_context = ParserContext::new();
+    let nodes = program(&mut tokens, &mut parser_context);
+
+    ParseResult {
+        nodes,
+        stack_size: parser_context.stack_size(),
+    }
 }
 
 fn program<'a, I>(tokens: &mut Peekable<I>, ctx: &mut ParserContext) -> Vec<Node>
@@ -589,7 +604,7 @@ mod tests {
     #[test]
     fn test_ok_parse_single() -> Result<()> {
         let tokens = lexer::tokenize("1;")?;
-        let actual = parse(tokens);
+        let actual = parse(tokens).nodes;
 
         assert_eq!(actual, vec![Node::num(1)]);
 
@@ -599,7 +614,7 @@ mod tests {
     #[test]
     fn test_ok_parse_complex() -> Result<()> {
         let tokens = lexer::tokenize("(+1 + -2) * 3 - 4 / 5;")?;
-        let actual = parse(tokens);
+        let actual = parse(tokens).nodes;
 
         assert_eq!(
             actual,
@@ -624,7 +639,7 @@ mod tests {
     #[test]
     fn test_ok_with_cmp() -> Result<()> {
         let tokens = lexer::tokenize("(1 + 2 * 3 > 4) != (5 < 6 == 7 >= 8);")?;
-        let actual = parse(tokens);
+        let actual = parse(tokens).nodes;
 
         assert_eq!(
             actual,
@@ -653,7 +668,7 @@ mod tests {
     #[test]
     fn test_ok_with_assign() -> Result<()> {
         let tokens = lexer::tokenize("a = 1 + 2 * 3; bar = a; return bar;")?;
-        let actual = parse(tokens);
+        let actual = parse(tokens).nodes;
 
         assert_eq!(
             actual,
@@ -678,7 +693,7 @@ mod tests {
     #[test]
     fn test_ok_if() -> Result<()> {
         let tokens = lexer::tokenize("if (1) return 2; else return 3;")?;
-        let actual = parse(tokens);
+        let actual = parse(tokens).nodes;
 
         assert_eq!(
             actual,
@@ -696,7 +711,7 @@ mod tests {
     #[test]
     fn test_ok_while() -> Result<()> {
         let tokens = lexer::tokenize("while (1) return 2;")?;
-        let actual = parse(tokens);
+        let actual = parse(tokens).nodes;
 
         assert_eq!(
             actual,
@@ -714,7 +729,7 @@ mod tests {
     #[test]
     fn test_ok_for() -> Result<()> {
         let tokens = lexer::tokenize("for (i = 0; i < 10; i = i + 1) return i;")?;
-        let actual = parse(tokens);
+        let actual = parse(tokens).nodes;
 
         assert_eq!(
             actual,

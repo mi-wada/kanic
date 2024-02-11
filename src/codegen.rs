@@ -1,11 +1,13 @@
 use crate::{
     lexer,
-    parser::{self, ArithOp, Node},
+    parser::{self, ArithOp, Node, ParseResult},
 };
 use anyhow::Result;
 
 pub fn generate(c_code: &str) -> Result<String> {
-    Ok(String::from(
+    let ParseResult { nodes, stack_size } = parser::parse(lexer::tokenize(c_code)?);
+
+    Ok(format!(
         "\
 .intel_syntax noprefix
 .globl main
@@ -13,8 +15,9 @@ pub fn generate(c_code: &str) -> Result<String> {
 main:
         push rbp
         mov rbp, rsp
+        sub rsp, {stack_size}
 ",
-    ) + &nodes_to_asem(&parser::parse(lexer::tokenize(c_code)?))?)
+    ) + &nodes_to_asem(&nodes)?)
 }
 
 fn nodes_to_asem(nodes: &[Node]) -> Result<String> {
