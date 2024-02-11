@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 rust:1.75.0
+FROM --platform=linux/amd64 rust:1.76.0
 
 WORKDIR /app
 
