@@ -80,6 +80,7 @@ pub enum Symbol {
     Neq,
     Assign,
     SemiColon,
+    Ret,
 }
 
 impl From<&str> for Symbol {
@@ -89,6 +90,7 @@ impl From<&str> for Symbol {
             ">=" => Self::Gte,
             "==" => Self::Eq,
             "!=" => Self::Neq,
+            "return" => Self::Ret,
             _ => panic!("Invalid symbol"),
         }
     }
@@ -182,19 +184,22 @@ pub fn tokenize(s: &str) -> Result<Tokens> {
                 tokens.push(Token::num(numbers.parse().unwrap(), code_location, s))
             }
             'a'..='z' | 'A'..='Z' | '_' => {
-                let mut ident = String::new();
-                ident.push(char);
+                let mut str = String::new();
+                str.push(char);
 
                 while let Some(&(_, next_char)) = chars.peek() {
                     if next_char.is_ascii_alphanumeric() || next_char == '_' {
-                        ident.push(next_char);
+                        str.push(next_char);
                         chars.next();
                     } else {
                         break;
                     }
                 }
 
-                tokens.push(Token::ident(ident, code_location, s))
+                match str.as_str() {
+                    "return" => tokens.push(Token::symbol(Symbol::Ret, code_location, s)),
+                    _ => tokens.push(Token::ident(str, code_location, s)),
+                }
             }
             _ => {
                 error_reporter::report(s, code_location, "Invalid token");
@@ -263,7 +268,7 @@ mod tests {
 
     #[test]
     fn test_ok_assign() -> Result<()> {
-        let c_code = "a = 1; bar = 2; car = a + bar;";
+        let c_code = "a = 1; bar = 2; car = a + bar; return car;";
         let mut actual = tokenize(c_code)?.into_iter();
 
         assert_eq!(actual.next(), Some(Token::ident("a".into(), 0, c_code)));
@@ -297,6 +302,12 @@ mod tests {
         assert_eq!(
             actual.next(),
             Some(Token::symbol(Symbol::SemiColon, 29, c_code))
+        );
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Ret, 31, c_code)));
+        assert_eq!(actual.next(), Some(Token::ident("car".into(), 38, c_code)));
+        assert_eq!(
+            actual.next(),
+            Some(Token::symbol(Symbol::SemiColon, 41, c_code))
         );
         assert_eq!(actual.next(), None);
 

@@ -15,11 +15,7 @@ main:
         mov rbp, rsp
         sub rsp, 208
 ",
-    ) + &nodes_to_asem(&parser::parse(lexer::tokenize(c_code)?))?
-        + "        mov rsp, rbp
-        pop rbp
-        ret
-")
+    ) + &nodes_to_asem(&parser::parse(lexer::tokenize(c_code)?))?)
 }
 
 fn nodes_to_asem(nodes: &[Node]) -> Result<String> {
@@ -27,7 +23,6 @@ fn nodes_to_asem(nodes: &[Node]) -> Result<String> {
 
     for node in nodes {
         asem += &to_asem(node)?;
-        asem += "        pop rax\n";
     }
 
     Ok(asem)
@@ -90,5 +85,11 @@ fn to_asem(ast: &Node) -> Result<String> {
         push rax
 "
             )),
+        Node::Ret { value } => Ok(to_asem(value.as_ref())?
+            + "        pop rax
+        mov rsp, rbp
+        pop rbp
+        ret
+"),
     }
 }

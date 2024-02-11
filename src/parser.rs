@@ -13,6 +13,9 @@ pub enum Node {
         // Local variable address = RBP - offset
         offset: usize,
     },
+    Ret {
+        value: NodeChild,
+    },
     ArithOp {
         value: ArithOp,
         lhs: NodeChild,
@@ -34,6 +37,12 @@ impl Node {
 
     fn local_var(offset: usize) -> Self {
         Self::LocalVar { offset }
+    }
+
+    fn ret(child: Node) -> Self {
+        Node::Ret {
+            value: Box::new(child),
+        }
     }
 
     fn arith_op(value: ArithOp, lhs: Node, rhs: Node) -> Self {
@@ -168,7 +177,16 @@ fn stmt<'a, I>(tokens: &mut Peekable<I>, ctx: &mut ParserContext) -> Node
 where
     I: Iterator<Item = Token<'a>>,
 {
-    let node = expr(tokens, ctx);
+    let node = match tokens.peek() {
+        Some(Token {
+            value: TokenKind::Symbol(Symbol::Ret),
+            ..
+        }) => {
+            tokens.next().unwrap();
+            Node::ret(expr(tokens, ctx))
+        }
+        _ => expr(tokens, ctx),
+    };
 
     match tokens.next() {
         Some(Token {
@@ -484,7 +502,7 @@ mod tests {
 
     #[test]
     fn test_ok_with_assign() -> Result<()> {
-        let tokens = lexer::tokenize("a = 1 + 2 * 3; bar = a;")?;
+        let tokens = lexer::tokenize("a = 1 + 2 * 3; bar = a; return bar;")?;
         let actual = parse(tokens);
 
         assert_eq!(
@@ -499,7 +517,8 @@ mod tests {
                         Node::arith_op(ArithOp::Mul, Node::num(2), Node::num(3))
                     )
                 ),
-                Node::arith_op(ArithOp::Assign, Node::local_var(16), Node::local_var(8))
+                Node::arith_op(ArithOp::Assign, Node::local_var(16), Node::local_var(8)),
+                Node::ret(Node::local_var(16))
             ]
         );
 
