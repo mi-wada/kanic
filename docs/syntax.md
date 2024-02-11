@@ -5,6 +5,7 @@ Syntax of the C language for which this repository is compiled, written in [EBNF
 ```ebnf
 program    = stmt*
 stmt       = expr ";"
+             | "if" "(" expr ")" stmt ("else" stmt)?
              | "return" expr ";"
 expr       = assign
 assign     = equality ("=" assign)?

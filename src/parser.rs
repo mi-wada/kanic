@@ -16,6 +16,12 @@ pub enum Node {
     Ret {
         value: NodeChild,
     },
+    If {
+        label: String,
+        cond: NodeChild,
+        then: NodeChild,
+        else_: Option<NodeChild>,
+    },
     ArithOp {
         value: ArithOp,
         lhs: NodeChild,
@@ -42,6 +48,15 @@ impl Node {
     fn ret(child: Node) -> Self {
         Node::Ret {
             value: Box::new(child),
+        }
+    }
+
+    fn if_(label: String, cond: Node, then: Node, else_: Option<Node>) -> Self {
+        Self::If {
+            label,
+            cond: Box::new(cond),
+            then: Box::new(then),
+            else_: else_.map(Box::new),
         }
     }
 
@@ -140,13 +155,23 @@ impl From<&TokenKind> for ArithOp {
 
 struct ParserContext {
     local_variables: HashMap<String, LocalVariable>,
+    current_label_number: usize,
 }
 
 impl ParserContext {
     fn new() -> Self {
         Self {
             local_variables: HashMap::new(),
+            current_label_number: 0,
         }
+    }
+}
+
+impl ParserContext {
+    fn new_label(&mut self) -> String {
+        let label = format!(".L{}", self.current_label_number);
+        self.current_label_number += 1;
+        label
     }
 }
 
@@ -184,6 +209,51 @@ where
         }) => {
             tokens.next().unwrap();
             Node::ret(expr(tokens, ctx))
+        }
+        Some(Token {
+            value: TokenKind::Symbol(Symbol::If),
+            ..
+        }) => {
+            tokens.next().unwrap();
+
+            // TODO: Refactor
+            // Consume (
+            if let Token {
+                value: TokenKind::Symbol(Symbol::LParen),
+                ..
+            } = tokens.next().unwrap()
+            {
+                // Do nothing
+            } else {
+                invalid_token(None, Some("Must be ("));
+            }
+
+            let cond = expr(tokens, ctx);
+
+            if let Token {
+                value: TokenKind::Symbol(Symbol::RParen),
+                ..
+            } = tokens.next().unwrap()
+            {
+                // Do nothing
+            } else {
+                invalid_token(None, Some("Must be )"));
+            }
+
+            let then = stmt(tokens, ctx);
+
+            let else_ = match tokens.peek() {
+                Some(Token {
+                    value: TokenKind::Symbol(Symbol::Else),
+                    ..
+                }) => {
+                    tokens.next().unwrap();
+                    Some(stmt(tokens, ctx))
+                }
+                _ => None,
+            };
+
+            return Node::if_(ctx.new_label(), cond, then, else_);
         }
         _ => expr(tokens, ctx),
     };
@@ -520,6 +590,24 @@ mod tests {
                 Node::arith_op(ArithOp::Assign, Node::local_var(16), Node::local_var(8)),
                 Node::ret(Node::local_var(16))
             ]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_ok_if() -> Result<()> {
+        let tokens = lexer::tokenize("if (1) return 2; else return 3;")?;
+        let actual = parse(tokens);
+
+        assert_eq!(
+            actual,
+            vec![Node::if_(
+                ".L0".to_string(),
+                Node::num(1),
+                Node::ret(Node::num(2)),
+                Some(Node::ret(Node::num(3)))
+            )]
         );
 
         Ok(())

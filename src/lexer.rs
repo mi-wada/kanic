@@ -81,6 +81,8 @@ pub enum Symbol {
     Assign,
     SemiColon,
     Ret,
+    If,
+    Else,
 }
 
 impl From<&str> for Symbol {
@@ -91,6 +93,8 @@ impl From<&str> for Symbol {
             "==" => Self::Eq,
             "!=" => Self::Neq,
             "return" => Self::Ret,
+            "if" => Self::If,
+            "else" => Self::Else,
             _ => panic!("Invalid symbol"),
         }
     }
@@ -198,6 +202,8 @@ pub fn tokenize(s: &str) -> Result<Tokens> {
 
                 match str.as_str() {
                     "return" => tokens.push(Token::symbol(Symbol::Ret, code_location, s)),
+                    "if" => tokens.push(Token::symbol(Symbol::If, code_location, s)),
+                    "else" => tokens.push(Token::symbol(Symbol::Else, code_location, s)),
                     _ => tokens.push(Token::ident(str, code_location, s)),
                 }
             }
@@ -308,6 +314,41 @@ mod tests {
         assert_eq!(
             actual.next(),
             Some(Token::symbol(Symbol::SemiColon, 41, c_code))
+        );
+        assert_eq!(actual.next(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_ok_if() -> Result<()> {
+        let c_code = "if (1 < 2) return 3; else return 4;";
+        let mut actual = tokenize(c_code)?.into_iter();
+
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::If, 0, c_code)));
+        assert_eq!(
+            actual.next(),
+            Some(Token::symbol(Symbol::LParen, 3, c_code))
+        );
+        assert_eq!(actual.next(), Some(Token::num(1, 4, c_code)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Lt, 6, c_code)));
+        assert_eq!(actual.next(), Some(Token::num(2, 8, c_code)));
+        assert_eq!(
+            actual.next(),
+            Some(Token::symbol(Symbol::RParen, 9, c_code))
+        );
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Ret, 11, c_code)));
+        assert_eq!(actual.next(), Some(Token::num(3, 18, c_code)));
+        assert_eq!(
+            actual.next(),
+            Some(Token::symbol(Symbol::SemiColon, 19, c_code))
+        );
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Else, 21, c_code)));
+        assert_eq!(actual.next(), Some(Token::symbol(Symbol::Ret, 26, c_code)));
+        assert_eq!(actual.next(), Some(Token::num(4, 33, c_code)));
+        assert_eq!(
+            actual.next(),
+            Some(Token::symbol(Symbol::SemiColon, 34, c_code))
         );
         assert_eq!(actual.next(), None);
 

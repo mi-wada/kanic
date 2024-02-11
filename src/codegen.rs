@@ -90,5 +90,26 @@ fn to_asem(ast: &Node) -> Result<String> {
         pop rbp
         ret
 "),
+        Node::If {
+            label,
+            cond,
+            then,
+            else_,
+        } => Ok(to_asem(cond.as_ref())?
+            + &format!(
+                "        pop rax
+        cmp rax, 0
+        je {label}
+"
+            )
+            + &to_asem(then.as_ref())?
+            + &format!(
+                "{label}:
+"
+            )
+            + &(match else_ {
+                Some(else_) => to_asem(else_.as_ref())?,
+                None => "".to_string(),
+            })),
     }
 }

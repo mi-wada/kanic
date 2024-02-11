@@ -20,5 +20,6 @@ C Compiler written by Rust. Based on <https://www.sigbus.info/compilerbook>.
 ## Run test
 
 ```bash
+# In container
 cargo test
 ```

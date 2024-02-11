@@ -43,6 +43,16 @@ fn test_double_return() {
 }
 
 #[test]
+fn test_if_eval_if() {
+    assert_exit_code("a = 20; b = 10; if (a > b) return a; else return b;", 20);
+}
+
+#[test]
+fn test_if_eval_else() {
+    assert_exit_code("a = 20; b = 10; if (a < b) return a; else return b;", 10);
+}
+
+#[test]
 fn test_ng_only_symbol() {
     let res = std::process::Command::new("target/debug/kanic")
         .arg("10 + 2 == == 2")
